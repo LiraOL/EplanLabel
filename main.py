@@ -5,6 +5,7 @@ Eplan Label Tool by Wolfs-TS - Improved UI (ES / EN / NL)
 - Automatic blank marker filtering
 - Language selector
 - Responsive two-pane layout (no clipping on smaller screens)
+- Built-in self updater (GitHub)
 """
 
 import sys
@@ -15,6 +16,19 @@ import re
 import tempfile
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
+import json
+import shutil
+
+__version__ = "2026.09.03"
+APP_FILE_NAME = "main.py"
+REPO_OWNER = "LiraOL"
+REPO_NAME = "EplanLabel"
+BRANCH = "main"
+RAW_MAIN_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/{BRANCH}/{APP_FILE_NAME}"
+API_MAIN_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{APP_FILE_NAME}?ref={BRANCH}"
+AUTO_UPDATE_CHECK = True
 
 print(sys.version)
 print("Current working directory:", os.getcwd())
@@ -60,6 +74,18 @@ translations = {
         "filter_yes": "Ja",
         "filter_no": "Nee (alle kasten)",
         "lang_label": "Taal:",
+        "updates_menu": "Updates",
+        "check_updates": "Controleer op updates",
+        "auto_check": "Automatisch controleren bij opstart",
+        "update_available_title": "Update beschikbaar",
+        "update_available_body": "Nieuwe versie gevonden: {remote}\nHuidige versie: {local}\n\nNu updaten?",
+        "update_none_title": "Geen updates",
+        "update_none_body": "Je gebruikt al de nieuwste versie ({local}).",
+        "update_success_title": "Update voltooid",
+        "update_success_body": "Update geïnstalleerd naar versie {remote}.\nDe app wordt opnieuw gestart.",
+        "update_error_title": "Update mislukt",
+        "update_error_body": "Kon update niet installeren:\n{err}",
+        "update_check_error": "Kon niet op updates controleren:\n{err}",
     },
     "en": {
         "app_title": "Eplan Label Tool by Wolfs-TS — v3 (Groepscode + Blank Filter)",
@@ -99,6 +125,18 @@ translations = {
         "filter_yes": "Yes",
         "filter_no": "No (all panels)",
         "lang_label": "Language:",
+        "updates_menu": "Updates",
+        "check_updates": "Check for updates",
+        "auto_check": "Auto-check on startup",
+        "update_available_title": "Update available",
+        "update_available_body": "New version found: {remote}\nCurrent version: {local}\n\nUpdate now?",
+        "update_none_title": "No updates",
+        "update_none_body": "You're already on the latest version ({local}).",
+        "update_success_title": "Update completed",
+        "update_success_body": "Updated to version {remote}.\nThe app will now restart.",
+        "update_error_title": "Update failed",
+        "update_error_body": "Could not install update:\n{err}",
+        "update_check_error": "Could not check for updates:\n{err}",
     },
     "es": {
         "app_title": "Herramienta de Etiquetas Eplan por Wolfs-TS — v3 (Groepscode + Filtro blanco)",
@@ -138,6 +176,18 @@ translations = {
         "filter_yes": "Sí",
         "filter_no": "No (todos los cuadros)",
         "lang_label": "Idioma:",
+        "updates_menu": "Actualizaciones",
+        "check_updates": "Buscar actualizaciones",
+        "auto_check": "Comprobar automáticamente al iniciar",
+        "update_available_title": "Actualización disponible",
+        "update_available_body": "Nueva versión encontrada: {remote}\nVersión actual: {local}\n\n¿Actualizar ahora?",
+        "update_none_title": "Sin actualizaciones",
+        "update_none_body": "Ya tienes la última versión ({local}).",
+        "update_success_title": "Actualización completada",
+        "update_success_body": "Actualizado a la versión {remote}.\nLa app se reiniciará ahora.",
+        "update_error_title": "Error de actualización",
+        "update_error_body": "No se pudo instalar la actualización:\n{err}",
+        "update_check_error": "No se pudo comprobar actualizaciones:\n{err}",
     }
 }
 
@@ -148,13 +198,10 @@ def t(key):
     return translations.get(current_lang, translations["nl"]).get(key, key)
 
 
-# ============== GLOBALS ==============
-
 loaded_files = {}
 detected_panels = []
 panel_listbox = None
 
-# Widgets updated by language/resize handlers
 root = None
 open_btn = None
 FilenameTitle_label = None
@@ -173,7 +220,6 @@ status_klemmenstrook = None
 status_legends = None
 status_onderdelen = None
 
-# label option widgets for live translation
 lbl_kast_section = None
 chk_groep = None
 chk_onderdelen = None
@@ -192,10 +238,94 @@ btn_select_none = None
 chk_use_filter = None
 btn_detect = None
 
+menu_updates = None
+auto_update_var = None
+
 project_loaded = False
 
 
-# ============== MPrintPRO HELPERS ==============
+def get_local_script_path():
+    if getattr(sys, 'frozen', False):
+        return os.path.abspath(sys.executable)
+    return os.path.abspath(__file__)
+
+
+def parse_version_from_text(text):
+    m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text)
+    return m.group(1).strip() if m else None
+
+
+def version_tuple(v):
+    parts = re.findall(r'\d+', str(v))
+    return tuple(int(x) for x in parts) if parts else (0,)
+
+
+def fetch_remote_main_content(timeout=10):
+    req = Request(RAW_MAIN_URL, headers={"User-Agent": "EplanLabelUpdater/1.0"})
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def fetch_remote_blob_sha(timeout=10):
+    req = Request(API_MAIN_URL, headers={"User-Agent": "EplanLabelUpdater/1.0"})
+    with urlopen(req, timeout=timeout) as resp:
+        data = json.loads(resp.read().decode("utf-8", errors="replace"))
+    return data.get("sha", "")
+
+
+def restart_app():
+    try:
+        python = sys.executable
+        script = get_local_script_path()
+        if getattr(sys, 'frozen', False):
+            os.execl(python, python)
+        else:
+            os.execl(python, python, script)
+    except Exception as e:
+        messagebox.showerror(t("update_error_title"), t("update_error_body").format(err=str(e)))
+
+
+def apply_update(remote_content):
+    local_path = get_local_script_path()
+    backup_path = local_path + ".bak"
+    temp_path = local_path + ".new"
+
+    with open(temp_path, "w", encoding="utf-8", errors="ignore") as f:
+        f.write(remote_content)
+
+    shutil.copy2(local_path, backup_path)
+    os.replace(temp_path, local_path)
+
+
+def check_for_updates(show_no_update=True, silent_errors=False):
+    try:
+        remote_text = fetch_remote_main_content()
+        remote_ver = parse_version_from_text(remote_text)
+        if not remote_ver:
+            raise RuntimeError("Remote version tag not found.")
+
+        local_ver = __version__
+        if version_tuple(remote_ver) <= version_tuple(local_ver):
+            if show_no_update:
+                messagebox.showinfo(t("update_none_title"), t("update_none_body").format(local=local_ver))
+            return False
+
+        do_update = messagebox.askyesno(
+            t("update_available_title"),
+            t("update_available_body").format(remote=remote_ver, local=local_ver)
+        )
+        if not do_update:
+            return False
+
+        apply_update(remote_text)
+        messagebox.showinfo(t("update_success_title"), t("update_success_body").format(remote=remote_ver))
+        restart_app()
+        return True
+
+    except (URLError, HTTPError, TimeoutError, OSError, RuntimeError, ValueError) as e:
+        if not silent_errors:
+            messagebox.showwarning(t("update_error_title"), t("update_check_error").format(err=str(e)))
+        return False
 
 
 def StartMprintPro(misFile, sourcefile):
@@ -219,14 +349,7 @@ def StartMprintProDirect(misFile, sourcefile):
     subprocess.Popen(command)
 
 
-# ============== FILTERING LOGIC ==============
-
-
 def create_filtered_temp(source_path, selected_panels):
-    """Create a temporary file with only relevant lines.
-    - Removes completely empty lines and blank markers
-    - Applies panel filter if active
-    """
     if not selected_panels:
         try:
             with open(source_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -283,9 +406,6 @@ def create_filtered_temp(source_path, selected_panels):
         return source_path
 
 
-# ============== PANEL DETECTION ==============
-
-
 def detect_and_update_panels():
     global detected_panels, panel_listbox
 
@@ -310,9 +430,6 @@ def detect_and_update_panels():
             panel_listbox.insert(tk.END, p)
         if detected_panels:
             panel_listbox.select_set(0, tk.END)
-
-
-# ============== MAIN GENERATE FUNCTION ==============
 
 
 def generate_labels():
@@ -382,9 +499,6 @@ def generate_labels():
     )
 
 
-# ============== LOAD PROJECT FOLDER ==============
-
-
 def update_loaded_indicators():
     status_map = {
         'groep': status_groep,
@@ -441,9 +555,6 @@ def load_project_folder():
     project_loaded = True
 
 
-# ============== LANGUAGE HANDLING ==============
-
-
 def refresh_ui_texts():
     root.title(t("app_title"))
     open_btn.config(text=t("load_btn"))
@@ -475,6 +586,11 @@ def refresh_ui_texts():
     chk_use_filter.config(text=t("apply_filter"))
     btn_detect.config(text=t("detect_btn"))
 
+    if menu_updates is not None:
+        root.nametowidget(root['menu']).entryconfig(0, label=t("updates_menu"))
+        menu_updates.entryconfig(0, label=t("check_updates"))
+        menu_updates.entryconfig(1, label=t("auto_check"))
+
     if not project_loaded:
         Filename_label.config(text=t("no_project"))
         status_var.set(t("status_ready"))
@@ -498,9 +614,6 @@ def on_lang_change(event):
         change_language("es")
 
 
-# ============== RESPONSIVE HELPERS ==============
-
-
 def update_wraps():
     if info_label is not None and right_frame is not None:
         wrap = max(260, right_frame.winfo_width() - 40)
@@ -511,8 +624,6 @@ def on_resize(event):
     if event.widget is root:
         update_wraps()
 
-
-# ============== GUI ==============
 
 root = tk.Tk()
 root.geometry("1180x760")
@@ -530,10 +641,8 @@ status_var = tk.StringVar(value=t("status_ready"))
 status_bar = tk.Label(root, textvariable=status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W)
 status_bar.grid(row=1, column=0, sticky="ew")
 
-# Top bar
 top_bar = tk.Frame(frame)
 top_bar.grid(row=0, column=0, columnspan=3, sticky="ew", pady=5)
-
 top_bar.columnconfigure(0, weight=1)
 
 open_btn = tk.Button(
@@ -563,7 +672,6 @@ lang_combo.set("Nederlands")
 lang_combo.pack(side=tk.LEFT, padx=5)
 lang_combo.bind("<<ComboboxSelected>>", on_lang_change)
 
-# File status indicators
 status_frame = tk.Frame(frame)
 status_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=3)
 status_groep = tk.Label(status_frame, text="✗ GROEP", width=12, relief=tk.GROOVE)
@@ -575,7 +683,6 @@ status_onderdelen = tk.Label(status_frame, text="✗ ONDERDELEN", width=14, reli
 for lbl in [status_groep, status_kabels, status_klemmen, status_klemmenstrook, status_legends, status_onderdelen]:
     lbl.pack(side=tk.LEFT, padx=3)
 
-# Main split
 main_paned = tk.PanedWindow(frame, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=6)
 main_paned.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=5)
 
@@ -644,7 +751,6 @@ action_btn = tk.Button(
 )
 action_btn.pack(pady=20, fill=tk.X)
 
-# Right pane
 right_frame = tk.LabelFrame(main_paned, text=t("panels_section"), padx=10, pady=8)
 main_paned.add(right_frame, minsize=320, width=420)
 
@@ -688,13 +794,22 @@ btn_detect.pack(pady=4, fill=tk.X)
 footer = tk.Label(frame, text=t("footer"), font=('calibre', 8), fg="gray")
 footer.grid(row=3, column=0, columnspan=3, sticky="w", pady=5)
 
-# Keyboard shortcuts
+menubar = tk.Menu(root)
+menu_updates = tk.Menu(menubar, tearoff=0)
+menu_updates.add_command(label=t("check_updates"), command=lambda: check_for_updates(show_no_update=True, silent_errors=False))
+auto_update_var = tk.BooleanVar(value=AUTO_UPDATE_CHECK)
+menu_updates.add_checkbutton(label=t("auto_check"), variable=auto_update_var)
+menubar.add_cascade(label=t("updates_menu"), menu=menu_updates)
+root.config(menu=menubar)
+
 root.bind('<Control-o>', lambda e: load_project_folder())
 root.bind('<F5>', lambda e: detect_and_update_panels())
 root.bind('<Return>', lambda e: generate_labels())
 root.bind('<Configure>', on_resize)
 
-# Initialize layout-dependent wrapping after first draw
 root.after(100, update_wraps)
+
+if AUTO_UPDATE_CHECK:
+    root.after(1200, lambda: check_for_updates(show_no_update=False, silent_errors=True))
 
 root.mainloop()
