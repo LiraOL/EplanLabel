@@ -75,6 +75,7 @@ translations = {
         "settings_title": "Instellingen",
         "settings_main_folder": "Hoofdprojectmap:",
         "settings_browse": "Bladeren...",
+        "settings_legacy_selection": "Legacy-selectie activeren",
         "settings_save": "Opslaan",
         "settings_cancel": "Annuleren",
         "settings_saved": "Instellingen opgeslagen.",
@@ -98,7 +99,11 @@ translations = {
         "msg_folder_loaded": "Map geladen: {project_name}",
         "msg_manual_update_title": "Handmatige update",
         "msg_auto_update_title": "Automatische update",
-        "msg_update_handler_missing": "Deze update-optie is nog niet beschikbaar."
+        "msg_update_handler_missing": "Deze update-optie is nog niet beschikbaar.",
+        "cabinet_markers": "Kastmarkeringen",
+        "component_markers": "Componentmarkeringen",
+        "terminal_markers": "Klemmenmarkeringen",
+        "cable_markers": "Kabelmarkeringen"
     },
     "en": {
         "app_title": "Eplan Label Tool by Wolfs-TS — v4 (Project loader + settings)",
@@ -148,6 +153,7 @@ translations = {
         "settings_title": "Settings",
         "settings_main_folder": "Main project folder:",
         "settings_browse": "Browse...",
+        "settings_legacy_selection": "Enable legacy selection",
         "settings_save": "Save",
         "settings_cancel": "Cancel",
         "settings_saved": "Settings saved.",
@@ -171,7 +177,11 @@ translations = {
         "msg_folder_loaded": "Folder loaded: {project_name}",
         "msg_manual_update_title": "Manual update",
         "msg_auto_update_title": "Auto update",
-        "msg_update_handler_missing": "This update option is not available yet."
+        "msg_update_handler_missing": "This update option is not available yet.",
+        "cabinet_markers": "Cabinet markers",
+        "component_markers": "Component markers",
+        "terminal_markers": "Terminal markers",
+        "cable_markers": "Cable markers"
     },
     "es": {
         "app_title": "Herramienta de Etiquetas Eplan por Wolfs-TS — v4 (Cargador de proyecto + ajustes)",
@@ -221,6 +231,7 @@ translations = {
         "settings_title": "Ajustes",
         "settings_main_folder": "Carpeta principal de proyectos:",
         "settings_browse": "Examinar...",
+        "settings_legacy_selection": "Activar selección heredada",
         "settings_save": "Guardar",
         "settings_cancel": "Cancelar",
         "settings_saved": "Ajustes guardados.",
@@ -244,7 +255,11 @@ translations = {
         "msg_folder_loaded": "Carpeta cargada: {project_name}",
         "msg_manual_update_title": "Actualización manual",
         "msg_auto_update_title": "Actualización automática",
-        "msg_update_handler_missing": "Esta opción de actualización todavía no está disponible."
+        "msg_update_handler_missing": "Esta opción de actualización todavía no está disponible.",
+        "cabinet_markers": "Marcadores de armarios",
+        "component_markers": "Marcadores de componentes",
+        "terminal_markers": "Marcadores de bornes",
+        "cable_markers": "Marcadores de cables"
     }
 }
 
@@ -266,7 +281,8 @@ panel_listbox = None
 
 # App settings (persisted in a local JSON file next to this script).
 settings = {
-    "main_project_folder": ""
+    "main_project_folder": "",
+    "legacy_selection": False
 }
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
@@ -293,6 +309,10 @@ status_onderdelen = None
 # Label option widgets for live translation
 lbl_kast_section = None
 chk_groep = None
+chk_cabinet_markers = None
+chk_component_markers = None
+chk_terminal_markers = None
+chk_cable_markers = None
 chk_onderdelen = None
 chk_onderdelen_lpc = None
 chk_onderdelen_lbl = None
@@ -308,6 +328,8 @@ btn_select_all = None
 btn_select_none = None
 chk_use_filter = None
 btn_detect = None
+selection_mode_frame = None
+legacy_options_frame = None
 
 project_loaded = False
 
@@ -328,6 +350,7 @@ def load_settings_from_disk():
             data = json.load(f)
         if isinstance(data, dict):
             settings["main_project_folder"] = str(data.get("main_project_folder", "")).strip()
+            settings["legacy_selection"] = bool(data.get("legacy_selection", False))
     except Exception as ex:
         print("Could not load settings:", ex)
 
@@ -368,14 +391,20 @@ def open_settings_window():
     browse_btn = ttk.Button(container, text=t("settings_browse"), command=browse_folder)
     browse_btn.grid(row=1, column=1, padx=(8, 0), sticky="ew")
 
+    legacy_var = tk.BooleanVar(value=settings.get("legacy_selection", False))
+    legacy_chk = ttk.Checkbutton(container, text=t("settings_legacy_selection"), variable=legacy_var)
+    legacy_chk.grid(row=2, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
     def do_save():
         settings["main_project_folder"] = folder_var.get().strip()
+        settings["legacy_selection"] = legacy_var.get()
         save_settings_to_disk()
+        apply_selection_mode_ui()
         messagebox.showinfo(t("settings_title"), t("settings_saved"))
         win.destroy()
 
     btns = tk.Frame(container)
-    btns.grid(row=2, column=0, columnspan=2, sticky="e", pady=(14, 0))
+    btns.grid(row=3, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
     ttk.Button(btns, text=t("settings_cancel"), command=win.destroy).pack(side=tk.RIGHT, padx=(8, 0))
     ttk.Button(btns, text=t("settings_save"), command=do_save).pack(side=tk.RIGHT)
@@ -534,26 +563,43 @@ def generate_labels():
         return
 
     jobs = []
-    if var_groep.get() and loaded_files.get('groep'):
-        jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
-    if var_onderdelen.get() and loaded_files.get('onderdelen'):
-        jobs.append(("Onderdelen", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen R10.mis", False))
-    if var_onderdelen_lpc.get() and loaded_files.get('onderdelen'):
-        jobs.append(("Onderdelen LPC", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen_LPC.mis", True))
-    if var_onderdelen_lbl.get() and loaded_files.get('onderdelen'):
-        jobs.append(("Onderdelen Label", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen_VolgensLabelR02.mis", False))
-    if var_onderdelen_tw.get() and loaded_files.get('onderdelen'):
-        jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
-    if var_legends.get() and loaded_files.get('legends'):
-        jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis", False))
-    if var_klemmenstrook.get() and loaded_files.get('klemmenstrook'):
-        jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis", False))
-    if var_klemmen.get() and loaded_files.get('klemmen'):
-        jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis", False))
-    if var_kab10.get() and loaded_files.get('kabels'):
-        jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis", False))
-    if var_kab100.get() and loaded_files.get('kabels'):
-        jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis", False))
+    if settings.get("legacy_selection", False):
+        if var_groep.get() and loaded_files.get('groep'):
+            jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
+        if var_onderdelen.get() and loaded_files.get('onderdelen'):
+            jobs.append(("Onderdelen", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen R10.mis", False))
+        if var_onderdelen_lpc.get() and loaded_files.get('onderdelen'):
+            jobs.append(("Onderdelen LPC", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen_LPC.mis", True))
+        if var_onderdelen_lbl.get() and loaded_files.get('onderdelen'):
+            jobs.append(("Onderdelen Label", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen_VolgensLabelR02.mis", False))
+        if var_onderdelen_tw.get() and loaded_files.get('onderdelen'):
+            jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
+        if var_legends.get() and loaded_files.get('legends'):
+            jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis", False))
+        if var_klemmenstrook.get() and loaded_files.get('klemmenstrook'):
+            jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis", False))
+        if var_klemmen.get() and loaded_files.get('klemmen'):
+            jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis", False))
+        if var_kab10.get() and loaded_files.get('kabels'):
+            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis", False))
+        if var_kab100.get() and loaded_files.get('kabels'):
+            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis", False))
+    else:
+        if var_cabinet_markers.get():
+            if loaded_files.get('groep'):
+                jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
+            if loaded_files.get('legends'):
+                jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis", False))
+        if var_component_markers.get() and loaded_files.get('onderdelen'):
+            jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
+        if var_terminal_markers.get():
+            if loaded_files.get('klemmenstrook'):
+                jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis", False))
+            if loaded_files.get('klemmen'):
+                jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis", False))
+        if var_cable_markers.get() and loaded_files.get('kabels'):
+            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis", False))
+            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis", False))
 
     if not jobs:
         messagebox.showinfo(t("msg_nothing_selected"), t("msg_select_at_least_one"))
@@ -823,6 +869,10 @@ def refresh_ui_texts():
     lang_label_widget.config(text=t("lang_label"))
 
     lbl_kast_section.config(text=t("kast_section"))
+    chk_cabinet_markers.config(text=t("cabinet_markers"))
+    chk_component_markers.config(text=t("component_markers"))
+    chk_terminal_markers.config(text=t("terminal_markers"))
+    chk_cable_markers.config(text=t("cable_markers"))
     chk_groep.config(text=t("groepscode"))
     chk_onderdelen.config(text=t("onderdelen_norm"))
     chk_onderdelen_lpc.config(text=t("onderdelen_lpc"))
@@ -855,6 +905,21 @@ def refresh_ui_texts():
         status_var.set(t("status_ready"))
 
     update_wraps()
+
+
+def apply_selection_mode_ui():
+    """Show simplified or legacy label options based on settings."""
+    use_legacy = settings.get("legacy_selection", False)
+    if use_legacy:
+        if not legacy_options_frame.winfo_manager():
+            legacy_options_frame.pack(anchor="w", fill="x")
+        if selection_mode_frame.winfo_manager():
+            selection_mode_frame.pack_forget()
+    else:
+        if not selection_mode_frame.winfo_manager():
+            selection_mode_frame.pack(anchor="w", fill="x")
+        if legacy_options_frame.winfo_manager():
+            legacy_options_frame.pack_forget()
 
 
 def change_language(new_lang):
@@ -991,50 +1056,72 @@ main_paned.add(left_frame, minsize=340, width=430)
 lbl_kast_section = tk.Label(left_frame, text=t("kast_section"), font=('calibre', 10, 'bold'), fg="#2E86AB")
 lbl_kast_section.pack(anchor="w", pady=(5, 2))
 
+selection_mode_frame = tk.Frame(left_frame)
+selection_mode_frame.pack(anchor="w", fill="x")
+
+var_cabinet_markers = tk.BooleanVar(value=True)
+chk_cabinet_markers = ttk.Checkbutton(selection_mode_frame, text=t("cabinet_markers"), variable=var_cabinet_markers)
+chk_cabinet_markers.pack(anchor="w")
+
+var_component_markers = tk.BooleanVar(value=True)
+chk_component_markers = ttk.Checkbutton(selection_mode_frame, text=t("component_markers"), variable=var_component_markers)
+chk_component_markers.pack(anchor="w")
+
+var_terminal_markers = tk.BooleanVar(value=True)
+chk_terminal_markers = ttk.Checkbutton(selection_mode_frame, text=t("terminal_markers"), variable=var_terminal_markers)
+chk_terminal_markers.pack(anchor="w")
+
+var_cable_markers = tk.BooleanVar(value=True)
+chk_cable_markers = ttk.Checkbutton(selection_mode_frame, text=t("cable_markers"), variable=var_cable_markers)
+chk_cable_markers.pack(anchor="w")
+
+legacy_options_frame = tk.Frame(left_frame)
+legacy_options_frame.pack(anchor="w", fill="x")
+
 var_groep = tk.BooleanVar(value=True)
-chk_groep = ttk.Checkbutton(left_frame, text=t("groepscode"), variable=var_groep)
+chk_groep = ttk.Checkbutton(legacy_options_frame, text=t("groepscode"), variable=var_groep)
 chk_groep.pack(anchor="w")
 
 var_onderdelen = tk.BooleanVar(value=True)
-chk_onderdelen = ttk.Checkbutton(left_frame, text=t("onderdelen_norm"), variable=var_onderdelen)
+chk_onderdelen = ttk.Checkbutton(legacy_options_frame, text=t("onderdelen_norm"), variable=var_onderdelen)
 chk_onderdelen.pack(anchor="w")
 
 var_onderdelen_lpc = tk.BooleanVar(value=False)
-chk_onderdelen_lpc = ttk.Checkbutton(left_frame, text=t("onderdelen_lpc"), variable=var_onderdelen_lpc)
+chk_onderdelen_lpc = ttk.Checkbutton(legacy_options_frame, text=t("onderdelen_lpc"), variable=var_onderdelen_lpc)
 chk_onderdelen_lpc.pack(anchor="w")
 
 var_onderdelen_lbl = tk.BooleanVar(value=False)
-chk_onderdelen_lbl = ttk.Checkbutton(left_frame, text=t("onderdelen_label"), variable=var_onderdelen_lbl)
+chk_onderdelen_lbl = ttk.Checkbutton(legacy_options_frame, text=t("onderdelen_label"), variable=var_onderdelen_lbl)
 chk_onderdelen_lbl.pack(anchor="w")
 
 var_onderdelen_tw = tk.BooleanVar(value=False)
-chk_onderdelen_tw = ttk.Checkbutton(left_frame, text=t("onderdelen_tech"), variable=var_onderdelen_tw)
+chk_onderdelen_tw = ttk.Checkbutton(legacy_options_frame, text=t("onderdelen_tech"), variable=var_onderdelen_tw)
 chk_onderdelen_tw.pack(anchor="w")
 
 var_legends = tk.BooleanVar(value=True)
-chk_legends = ttk.Checkbutton(left_frame, text=t("legends"), variable=var_legends)
+chk_legends = ttk.Checkbutton(legacy_options_frame, text=t("legends"), variable=var_legends)
 chk_legends.pack(anchor="w")
 
-lbl_klemmen_section = tk.Label(left_frame, text=t("klemmen_section"), font=('calibre', 10, 'bold'), fg="#2E86AB")
+lbl_klemmen_section = tk.Label(legacy_options_frame, text=t("klemmen_section"), font=('calibre', 10, 'bold'), fg="#2E86AB")
 lbl_klemmen_section.pack(anchor="w", pady=(12, 2))
 
 var_klemmenstrook = tk.BooleanVar(value=True)
-chk_klemmenstrook = ttk.Checkbutton(left_frame, text=t("klemmenstrook"), variable=var_klemmenstrook)
+chk_klemmenstrook = ttk.Checkbutton(legacy_options_frame, text=t("klemmenstrook"), variable=var_klemmenstrook)
 chk_klemmenstrook.pack(anchor="w")
 
 var_klemmen = tk.BooleanVar(value=True)
-chk_klemmen = ttk.Checkbutton(left_frame, text=t("klemmen_los"), variable=var_klemmen)
+chk_klemmen = ttk.Checkbutton(legacy_options_frame, text=t("klemmen_los"), variable=var_klemmen)
 chk_klemmen.pack(anchor="w")
 
-lbl_kabels_section = tk.Label(left_frame, text=t("kabels_section"), font=('calibre', 10, 'bold'), fg="#2E86AB")
+lbl_kabels_section = tk.Label(legacy_options_frame, text=t("kabels_section"), font=('calibre', 10, 'bold'), fg="#2E86AB")
 lbl_kabels_section.pack(anchor="w", pady=(12, 2))
 
 var_kab10 = tk.BooleanVar(value=True)
-chk_kab10 = ttk.Checkbutton(left_frame, text=t("kabels_0_10"), variable=var_kab10)
+chk_kab10 = ttk.Checkbutton(legacy_options_frame, text=t("kabels_0_10"), variable=var_kab10)
 chk_kab10.pack(anchor="w")
 
 var_kab100 = tk.BooleanVar(value=True)
-chk_kab100 = ttk.Checkbutton(left_frame, text=t("kabels_10_100"), variable=var_kab100)
+chk_kab100 = ttk.Checkbutton(legacy_options_frame, text=t("kabels_10_100"), variable=var_kab100)
 chk_kab100.pack(anchor="w")
 
 action_btn = tk.Button(
@@ -1102,6 +1189,7 @@ root.bind('<Configure>', on_resize)
 
 # Load settings and initialize wrapping after first draw.
 load_settings_from_disk()
+apply_selection_mode_ui()
 root.after(100, update_wraps)
 
 root.mainloop()
