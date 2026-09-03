@@ -69,6 +69,8 @@ translations = {
 
         "menu_settings": "Instellingen",
         "menu_open_settings": "Instellingen openen",
+        "menu_manual_update": "Handmatige update",
+        "menu_auto_update": "Automatische update",
 
         "settings_title": "Instellingen",
         "settings_main_folder": "Hoofdprojectmap:",
@@ -91,7 +93,12 @@ translations = {
         "msg_labels_missing": "De map 'labels' is niet gevonden in: {revision_path}",
         "msg_loaded_from_project": "Project geladen via nummer: {project_number} (revisie {revision_name})",
         "msg_no_matching_txt_title": "Geen bruikbare TXT bestanden",
-        "msg_no_matching_txt": "Er zijn wel TXT bestanden gevonden, maar geen bekende Eplan bestandsnamen (GROEPSCODE/KABELS/KLEMMEN/etc)."
+        "msg_no_matching_txt": "Er zijn wel TXT bestanden gevonden, maar geen bekende Eplan bestandsnamen (GROEPSCODE/KABELS/KLEMMEN/etc).",
+        "msg_select_txt_for_folder": "Selecteer één Eplan TXT-bestand uit de projectmap",
+        "msg_folder_loaded": "Map geladen: {project_name}",
+        "msg_manual_update_title": "Handmatige update",
+        "msg_auto_update_title": "Automatische update",
+        "msg_update_handler_missing": "Deze update-optie is nog niet beschikbaar."
     },
     "en": {
         "app_title": "Eplan Label Tool by Wolfs-TS — v4 (Project loader + settings)",
@@ -135,6 +142,8 @@ translations = {
 
         "menu_settings": "Settings",
         "menu_open_settings": "Open settings",
+        "menu_manual_update": "Manual update",
+        "menu_auto_update": "Auto update",
 
         "settings_title": "Settings",
         "settings_main_folder": "Main project folder:",
@@ -157,7 +166,12 @@ translations = {
         "msg_labels_missing": "The folder 'labels' was not found in: {revision_path}",
         "msg_loaded_from_project": "Project loaded by number: {project_number} (revision {revision_name})",
         "msg_no_matching_txt_title": "No usable TXT files",
-        "msg_no_matching_txt": "TXT files were found, but no known Eplan filenames matched (GROEPSCODE/KABELS/KLEMMEN/etc)."
+        "msg_no_matching_txt": "TXT files were found, but no known Eplan filenames matched (GROEPSCODE/KABELS/KLEMMEN/etc).",
+        "msg_select_txt_for_folder": "Select one Eplan TXT file from the project folder",
+        "msg_folder_loaded": "Folder loaded: {project_name}",
+        "msg_manual_update_title": "Manual update",
+        "msg_auto_update_title": "Auto update",
+        "msg_update_handler_missing": "This update option is not available yet."
     },
     "es": {
         "app_title": "Herramienta de Etiquetas Eplan por Wolfs-TS — v4 (Cargador de proyecto + ajustes)",
@@ -201,6 +215,8 @@ translations = {
 
         "menu_settings": "Ajustes",
         "menu_open_settings": "Abrir ajustes",
+        "menu_manual_update": "Actualización manual",
+        "menu_auto_update": "Actualización automática",
 
         "settings_title": "Ajustes",
         "settings_main_folder": "Carpeta principal de proyectos:",
@@ -223,7 +239,12 @@ translations = {
         "msg_labels_missing": "La carpeta 'labels' no se encontró en: {revision_path}",
         "msg_loaded_from_project": "Proyecto cargado por número: {project_number} (revisión {revision_name})",
         "msg_no_matching_txt_title": "No hay TXT utilizables",
-        "msg_no_matching_txt": "Se encontraron TXT, pero no coinciden con nombres Eplan conocidos (GROEPSCODE/KABELS/KLEMMEN/etc)."
+        "msg_no_matching_txt": "Se encontraron TXT, pero no coinciden con nombres Eplan conocidos (GROEPSCODE/KABELS/KLEMMEN/etc).",
+        "msg_select_txt_for_folder": "Selecciona un archivo TXT de Eplan de la carpeta del proyecto",
+        "msg_folder_loaded": "Carpeta cargada: {project_name}",
+        "msg_manual_update_title": "Actualización manual",
+        "msg_auto_update_title": "Actualización automática",
+        "msg_update_handler_missing": "Esta opción de actualización todavía no está disponible."
     }
 }
 
@@ -360,6 +381,24 @@ def open_settings_window():
     ttk.Button(btns, text=t("settings_save"), command=do_save).pack(side=tk.RIGHT)
 
     container.columnconfigure(0, weight=1)
+
+
+def run_manual_update():
+    """Run manual update handler when available; otherwise show a safe placeholder."""
+    handler = globals().get("manual_update")
+    if callable(handler):
+        handler()
+        return
+    messagebox.showinfo(t("msg_manual_update_title"), t("msg_update_handler_missing"))
+
+
+def run_auto_update():
+    """Run auto update handler when available; otherwise show a safe placeholder."""
+    handler = globals().get("auto_update")
+    if callable(handler):
+        handler()
+        return
+    messagebox.showinfo(t("msg_auto_update_title"), t("msg_update_handler_missing"))
 
 
 # ============================================================
@@ -601,9 +640,9 @@ def finish_project_load(project_display_name, status_text):
 # MANUAL FILE/FOLDER LOAD
 # ============================================================
 def load_project_folder():
-    """Load project by manually selecting TXT files (visible file picker)."""
-    selected_files = filedialog.askopenfilenames(
-        title="Select Eplan TXT files from the project folder",
+    """Load project by selecting one visible TXT file, then loading all TXT from that folder."""
+    selected_file = filedialog.askopenfilename(
+        title=t("msg_select_txt_for_folder"),
         filetypes=[
             ("Text files", "*.txt"),
             ("R0 text files", "*R0*.txt"),
@@ -611,11 +650,13 @@ def load_project_folder():
         ],
     )
 
-    if not selected_files:
+    if not selected_file:
         return
 
-    folder = os.path.dirname(selected_files[0])
-    candidates = list(selected_files)
+    folder = os.path.dirname(selected_file)
+    candidates = glob.glob(os.path.join(folder, "*R0*.txt"))
+    if not candidates:
+        candidates = glob.glob(os.path.join(folder, "*.txt"))
 
     detect_files_from_candidates(candidates)
 
@@ -623,7 +664,7 @@ def load_project_folder():
         messagebox.showwarning(t("msg_no_matching_txt_title"), t("msg_no_matching_txt"))
 
     project_name = os.path.basename(folder)
-    finish_project_load(project_name, f"Folder loaded: {project_name}")
+    finish_project_load(project_name, t("msg_folder_loaded").format(project_name=project_name))
 
 
 # ============================================================
@@ -806,6 +847,8 @@ def refresh_ui_texts():
     # Update settings menu labels as well.
     menubar.entryconfig(0, label=t("menu_settings"))
     settings_menu.entryconfig(0, label=t("menu_open_settings"))
+    settings_menu.entryconfig(1, label=t("menu_manual_update"))
+    settings_menu.entryconfig(2, label=t("menu_auto_update"))
 
     if not project_loaded:
         Filename_label.config(text=t("no_project"))
@@ -860,6 +903,8 @@ root.wm_title(t("app_title"))
 menubar = tk.Menu(root)
 settings_menu = tk.Menu(menubar, tearoff=0)
 settings_menu.add_command(label=t("menu_open_settings"), command=open_settings_window)
+settings_menu.add_command(label=t("menu_manual_update"), command=run_manual_update)
+settings_menu.add_command(label=t("menu_auto_update"), command=run_auto_update)
 menubar.add_cascade(label=t("menu_settings"), menu=settings_menu)
 root.config(menu=menubar)
 
