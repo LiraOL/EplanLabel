@@ -9,26 +9,6 @@ A professional desktop application for automating label generation in electrical
 
 The Eplan Label Tool provides a user-friendly graphical interface to streamline label generation for electrical designs. It integrates with MPrintPRO to automate the printing workflow, reducing manual effort and improving consistency across projects.
 
-### Key Features
-
-- **Multi-Language Support:** Full interface support for Dutch, English, and Spanish
-- **Project Management:** Load projects by folder selection or project number
-- **Intelligent File Detection:** Automatically identifies and classifies EPLAN text files
-- **Panel Filtering:** Detect and filter specific panels/cabinets from source data
-- **Automatic Data Cleaning:** Removes empty markers and blank lines automatically
-- **Dual Selection Modes:** Toggle between simplified and legacy label selection interfaces
-- **Persistent Settings:** Save and restore configuration preferences
-- **Responsive UI:** Adaptive layout that adjusts to window resizing
-- **Status Monitoring:** Real-time indicators showing loaded file types
-
-## Supported Label Types
-
-The tool supports generation for multiple label categories:
-
-- **Cabinet & Component Labels:** Group codes, parts (normal/LPC/technical), legends
-- **Terminal Labels:** Terminal strips, individual terminals
-- **Cable Labels:** Cables 0-10mm, cables 10-100mm
-
 ### Selection Modes
 
 1. **Simplified Mode** (Default)
