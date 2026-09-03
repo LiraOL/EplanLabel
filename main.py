@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """
-Eplan Label Tool by Wolfs-TS - Improved UI (ES / EN / NL)
-- Panel detection from Groepscode only
-- Automatic blank marker filtering
-- Language selector
-- Responsive two-pane layout (no clipping on smaller screens)
-
-Made by Lira Sobrino Rodríguez
+Eplan Label Tool by Wolfs-TS
+Improved by Lira Sobrino Rodríguez
 """
 
 import sys
@@ -28,7 +23,7 @@ print("Current working directory:", os.getcwd())
 # The current language is controlled by `current_lang` and helper `t(key)`.
 translations = {
     "nl": {
-        "app_title": "Eplan Label Tool by Wolfs-TS — v4 (Project loader + instellingen)",
+        "app_title": "Eplan Label Tool by Wolfs-TS",
         "load_btn": "📁 Laad projectmap (TXT)",
         "load_project_btn": "🔎 Project laden",
         "project_lbl": "Project:",
