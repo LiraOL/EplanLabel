@@ -890,9 +890,13 @@ def choose_revision_folder_format(parent):
 
     button_row = ttk.Frame(body)
     button_row.pack(fill="x")
-    ttk.Button(button_row, text=t("revision_format_new"), command=lambda: set_format("new")).pack(side="left", padx=(0, 8))
+    btn_new = ttk.Button(button_row, text=t("revision_format_new"), command=lambda: set_format("new"))
+    btn_new.pack(side="left", padx=(0, 8))
     ttk.Button(button_row, text=t("revision_format_old"), command=lambda: set_format("old")).pack(side="left", padx=(0, 8))
     ttk.Button(button_row, text=t("settings_cancel"), command=cancel).pack(side="right")
+
+    dialog.bind("<Escape>", lambda _event: cancel())
+    btn_new.focus_set()
 
     dialog.wait_window()
     return result["format"]
