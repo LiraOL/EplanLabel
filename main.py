@@ -887,6 +887,9 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
 
         self.bind("<Escape>", lambda _event: self.cancel())
         self.bind("<Return>", lambda _event: self.choose_new())
+        self.bind("<Tab>", self.focus_next_widget)
+        self.bind("<Shift-Tab>", self.focus_prev_widget)
+        self.bind("<ISO_Left_Tab>", self.focus_prev_widget)
         box.pack(fill="x", padx=10, pady=(0, 10))
         self.new_button.focus_set()
 
@@ -897,6 +900,20 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
     def choose_old(self):
         self.result = "old"
         self.destroy()
+
+    def focus_next_widget(self, _event):
+        current = self.focus_get()
+        next_widget = current.tk_focusNext() if current is not None else self.new_button
+        if next_widget is not None:
+            next_widget.focus_set()
+        return "break"
+
+    def focus_prev_widget(self, _event):
+        current = self.focus_get()
+        prev_widget = current.tk_focusPrev() if current is not None else self.new_button
+        if prev_widget is not None:
+            prev_widget.focus_set()
+        return "break"
 
 
 def choose_revision_folder_format(parent):
