@@ -71,6 +71,7 @@ translations = {
         "settings_main_folder": "Hoofdprojectmap:",
         "settings_browse": "Bladeren...",
         "settings_legacy_selection": "Legacy-selectie activeren",
+        "settings_revision_selection": "Legacy-revisie activeren",
         "settings_save": "Opslaan",
         "settings_cancel": "Annuleren",
         "settings_saved": "Instellingen opgeslagen.",
@@ -149,6 +150,7 @@ translations = {
         "settings_main_folder": "Main project folder:",
         "settings_browse": "Browse...",
         "settings_legacy_selection": "Enable legacy selection",
+        "settings_revision_selection": "Enable legacy revision",
         "settings_save": "Save",
         "settings_cancel": "Cancel",
         "settings_saved": "Settings saved.",
@@ -227,6 +229,7 @@ translations = {
         "settings_main_folder": "Carpeta principal de proyectos:",
         "settings_browse": "Examinar...",
         "settings_legacy_selection": "Activar selección heredada",
+        "settings_revision_selection": "Activar version R10",
         "settings_save": "Guardar",
         "settings_cancel": "Cancelar",
         "settings_saved": "Ajustes guardados.",
@@ -325,6 +328,7 @@ chk_use_filter = None
 btn_detect = None
 selection_mode_frame = None
 legacy_options_frame = None
+revision_selection_var = None
 
 project_loaded = False
 
@@ -333,6 +337,17 @@ project_loaded = False
 # SETTINGS HELPERS
 # ============================================================
 # These functions handle loading/saving the app configuration.
+def set_revision_selection(value):
+    """Update the active revision-selection setting and any live UI variable."""
+    global revision_selection_var
+    settings["revision_selection"] = bool(value)
+    if revision_selection_var is not None:
+        try:
+            revision_selection_var.set(settings["revision_selection"])
+        except tk.TclError:
+            revision_selection_var = None
+
+
 def load_settings_from_disk():
     """Load settings.json if present. If invalid/missing, keep defaults."""
     global settings
@@ -346,6 +361,7 @@ def load_settings_from_disk():
         if isinstance(data, dict):
             settings["main_project_folder"] = str(data.get("main_project_folder", "")).strip()
             settings["legacy_selection"] = bool(data.get("legacy_selection", False))
+            set_revision_selection(data.get("revision_selection", False))
     except Exception as ex:
         print("Could not load settings:", ex)
 
@@ -362,10 +378,11 @@ def save_settings_to_disk():
 
 def open_settings_window():
     """Open a small modal settings window to edit the main project folder."""
+    global revision_selection_var
     win = tk.Toplevel(root)
     win.title(t("settings_title"))
-    win.geometry("720x170")
-    win.minsize(600, 150)
+    win.geometry("720x210")
+    win.minsize(600, 180)
     win.transient(root)
     win.grab_set()
 
@@ -390,16 +407,29 @@ def open_settings_window():
     legacy_chk = ttk.Checkbutton(container, text=t("settings_legacy_selection"), variable=legacy_var)
     legacy_chk.grid(row=2, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
+    revision_var = tk.BooleanVar(value=settings.get("revision_selection", False))
+    revision_selection_var = revision_var
+    revision_chk = ttk.Checkbutton(container, text=t("settings_revision_selection"), variable=revision_var)
+    revision_chk.grid(row=3, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
     def do_save():
         settings["main_project_folder"] = folder_var.get().strip()
         settings["legacy_selection"] = legacy_var.get()
+        set_revision_selection(revision_var.get())
         save_settings_to_disk()
         apply_selection_mode_ui()
         messagebox.showinfo(t("settings_title"), t("settings_saved"))
         win.destroy()
 
+    def clear_revision_selection_var(_event=None):
+        global revision_selection_var
+        if revision_selection_var is revision_var:
+            revision_selection_var = None
+
+    win.bind("<Destroy>", clear_revision_selection_var)
+
     btns = tk.Frame(container)
-    btns.grid(row=3, column=0, columnspan=2, sticky="e", pady=(14, 0))
+    btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
     ttk.Button(btns, text=t("settings_cancel"), command=win.destroy).pack(side=tk.RIGHT, padx=(8, 0))
     ttk.Button(btns, text=t("settings_save"), command=do_save).pack(side=tk.RIGHT)
@@ -740,7 +770,7 @@ def detect_files_from_candidates(candidates):
 
     detected_revision = detect_revision_selection()
     if detected_revision is not None:
-        settings["revision_selection"] = detected_revision
+        set_revision_selection(detected_revision)
 
 
 def finish_project_load(project_display_name, status_text):
