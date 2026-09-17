@@ -867,39 +867,16 @@ def parse_revision_number(folder_name):
 def choose_revision_folder_format(parent):
     """Ask user which revision folder convention to use. Returns 'new', 'old', or None."""
     owner = parent or root
-    dialog = tk.Toplevel(owner)
-    dialog.title(t("msg_revision_format_title"))
-    dialog.transient(owner)
-    dialog.grab_set()
-    dialog.resizable(False, False)
-
-    result = {"format": None}
-
-    def set_format(choice):
-        result["format"] = choice
-        dialog.destroy()
-
-    def cancel():
-        dialog.destroy()
-
-    dialog.protocol("WM_DELETE_WINDOW", cancel)
-
-    body = ttk.Frame(dialog, padding=16)
-    body.pack(fill="both", expand=True)
-    ttk.Label(body, text=t("msg_revision_format_prompt"), justify="left", wraplength=360).pack(anchor="w", pady=(0, 12))
-
-    button_row = ttk.Frame(body)
-    button_row.pack(fill="x")
-    btn_new = ttk.Button(button_row, text=t("revision_format_new"), command=lambda: set_format("new"))
-    btn_new.pack(side="left", padx=(0, 8))
-    ttk.Button(button_row, text=t("revision_format_old"), command=lambda: set_format("old")).pack(side="left", padx=(0, 8))
-    ttk.Button(button_row, text=t("settings_cancel"), command=cancel).pack(side="right")
-
-    dialog.bind("<Escape>", lambda _event: cancel())
-    btn_new.focus_set()
-
-    dialog.wait_window()
-    return result["format"]
+    choice = messagebox.askyesnocancel(
+        t("msg_revision_format_title"),
+        f"{t('msg_revision_format_prompt')}\n\n"
+        f"{t('revision_format_new')} = Yes\n"
+        f"{t('revision_format_old')} = No",
+        parent=owner
+    )
+    if choice is None:
+        return None
+    return "new" if choice else "old"
 
 
 def find_project_folder_by_number(main_folder, project_number):
