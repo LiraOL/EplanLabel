@@ -864,19 +864,46 @@ def parse_revision_number(folder_name):
     return number
 
 
+class RevisionFolderFormatDialog(simpledialog.Dialog):
+    """Modal dialog to choose which revision folder convention to use."""
+
+    def body(self, master):
+        self.result = None
+        ttk.Label(
+            master,
+            text=t("msg_revision_format_prompt"),
+            justify="left",
+            wraplength=360
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 8))
+        return None
+
+    def buttonbox(self):
+        box = ttk.Frame(self)
+
+        self.new_button = ttk.Button(box, text=t("revision_format_new"), command=self.choose_new)
+        self.new_button.pack(side="left", padx=(0, 8))
+        ttk.Button(box, text=t("revision_format_old"), command=self.choose_old).pack(side="left", padx=(0, 8))
+        ttk.Button(box, text=t("settings_cancel"), command=self.cancel).pack(side="right")
+
+        self.bind("<Escape>", self.cancel)
+        self.bind("<Return>", lambda _event: self.choose_new())
+        box.pack(fill="x", padx=10, pady=(0, 10))
+        self.new_button.focus_set()
+
+    def choose_new(self):
+        self.result = "new"
+        self.destroy()
+
+    def choose_old(self):
+        self.result = "old"
+        self.destroy()
+
+
 def choose_revision_folder_format(parent):
     """Ask user which revision folder convention to use. Returns 'new', 'old', or None."""
     owner = parent or root
-    choice = messagebox.askyesnocancel(
-        t("msg_revision_format_title"),
-        f"{t('msg_revision_format_prompt')}\n\n"
-        f"{t('revision_format_new')} = Yes\n"
-        f"{t('revision_format_old')} = No",
-        parent=owner
-    )
-    if choice is None:
-        return None
-    return "new" if choice else "old"
+    dialog = RevisionFolderFormatDialog(owner, t("msg_revision_format_title"))
+    return dialog.result
 
 
 def find_project_folder_by_number(main_folder, project_number):
