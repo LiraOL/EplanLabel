@@ -867,6 +867,11 @@ def parse_revision_number(folder_name):
 class RevisionFolderFormatDialog(simpledialog.Dialog):
     """Modal dialog to choose which revision folder convention to use."""
 
+    def __init__(self, parent, title, new_option_text, old_option_text):
+        self.new_option_text = new_option_text
+        self.old_option_text = old_option_text
+        super().__init__(parent, title)
+
     def body(self, master):
         self.result = None
         self.choice_var = tk.StringVar(value="new")
@@ -876,9 +881,9 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
             justify="left",
             wraplength=360
         ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 8))
-        new_radio = ttk.Radiobutton(master, text=t("revision_format_new"), variable=self.choice_var, value="new")
+        new_radio = ttk.Radiobutton(master, text=self.new_option_text, variable=self.choice_var, value="new")
         new_radio.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 4))
-        ttk.Radiobutton(master, text=t("revision_format_old"), variable=self.choice_var, value="old").grid(
+        ttk.Radiobutton(master, text=self.old_option_text, variable=self.choice_var, value="old").grid(
             row=2, column=0, sticky="w", padx=10, pady=(0, 10)
         )
         return new_radio
@@ -887,7 +892,7 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
         self.result = self.choice_var.get()
 
 
-def choose_revision_folder_format(parent):
+def choose_revision_folder_format(parent, new_revision_name=None, old_revision_name=None):
     """Ask user which revision folder convention to use. Returns 'new', 'old', or None."""
     owner = parent
     try:
@@ -897,7 +902,14 @@ def choose_revision_folder_format(parent):
         owner = tk._default_root
     if owner is None:
         return None
-    dialog = RevisionFolderFormatDialog(owner, t("msg_revision_format_title"))
+    new_option_text = t("revision_format_new")
+    old_option_text = t("revision_format_old")
+    if new_revision_name:
+        new_option_text = f"{new_option_text} ({new_revision_name})"
+    if old_revision_name:
+        old_option_text = f"{old_option_text} ({old_revision_name})"
+
+    dialog = RevisionFolderFormatDialog(owner, t("msg_revision_format_title"), new_option_text, old_option_text)
     return dialog.result
 
 
@@ -938,7 +950,9 @@ def find_latest_revision_folder(tekeningen_folder, parent=None):
         return None, None, False
 
     if has_old and has_new:
-        selected_format = choose_revision_folder_format(parent)
+        latest_old = max(rev_candidates["old"], key=lambda x: x[0])
+        latest_new = max(rev_candidates["new"], key=lambda x: x[0])
+        selected_format = choose_revision_folder_format(parent, latest_new[1], latest_old[1])
         if selected_format is None:
             return None, None, True
     elif has_new:
