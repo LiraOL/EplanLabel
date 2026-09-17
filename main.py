@@ -714,7 +714,6 @@ def is_revision_header_line(line):
 def detect_revision_selection():
     """Return True for new format, False for old format, or None when detection fails."""
     inspected_any = False
-    had_read_error = False
 
     for file_path in loaded_files.values():
         if not file_path:
@@ -735,9 +734,8 @@ def detect_revision_selection():
                         return True
         except OSError as ex:
             print(f"Could not inspect revision format in {file_path}: {ex}")
-            had_read_error = True
 
-    if not inspected_any or had_read_error:
+    if not inspected_any:
         return None
     return False
 
