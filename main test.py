@@ -707,6 +707,7 @@ def generate_labels():
 # ============================================================
 REVISION_HEADER_PATTERN = re.compile(r'\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
 STRUCTURED_REVISION_HEADER_PATTERN = re.compile(r'^\s*;{4}\s*[^;\s]', flags=re.IGNORECASE)
+LABEL_FILE_KEYS = ('groep', 'kabels', 'klemmenstrook', 'klemmen', 'legends', 'onderdelen')
 
 
 def is_revision_header_line(line, allow_structured=True):
@@ -722,7 +723,10 @@ def detect_revision_selection():
     """Return True for new format, False for old format, or None when detection fails."""
     inspected_any = False
 
-    for file_key, file_path in loaded_files.items():
+    for file_key in LABEL_FILE_KEYS:
+        if file_key not in loaded_files:
+            continue
+        file_path = loaded_files.get(file_key)
         if not file_path:
             print("Could not inspect revision format: missing file path.")
             continue
