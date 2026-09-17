@@ -885,7 +885,7 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
         ttk.Button(box, text=t("revision_format_old"), command=self.choose_old).pack(side="left", padx=(0, 8))
         ttk.Button(box, text=t("settings_cancel"), command=self.cancel).pack(side="right")
 
-        self.bind("<Escape>", self.cancel)
+        self.bind("<Escape>", lambda _event: self.cancel())
         self.bind("<Return>", lambda _event: self.choose_new())
         box.pack(fill="x", padx=10, pady=(0, 10))
         self.new_button.focus_set()
