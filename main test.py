@@ -544,7 +544,7 @@ def detect_and_update_panels():
             with open(groep_path, 'r', encoding='utf-8', errors='ignore') as fh:
                 for ln in fh:
                     p = ln.strip()
-                    if p and 2 <= len(p) <= 25:
+                    if p and 2 <= len(p) <= 25 and not is_revision_header_line(p):
                         panel_set.add(p)
         except Exception as ex:
             print("Error reading Groepscode file:", ex)
@@ -684,6 +684,42 @@ def generate_labels():
 # ============================================================
 # FILE DETECTION AND LOAD HELPERS
 # ============================================================
+REVISION_HEADER_PATTERN = re.compile(r'^\s*;{0,4}.*\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
+
+
+def is_revision_header_line(line):
+    """Return True when the line looks like a revision-aware label header."""
+    return bool(REVISION_HEADER_PATTERN.search(line.strip()))
+
+
+def detect_revision_selection():
+    """Return True for new format, False for old format, or None when detection fails."""
+    inspected_any = False
+
+    for file_path in loaded_files.values():
+        if not file_path:
+            print("Could not inspect revision format: missing file path.")
+            return None
+        if not os.path.exists(file_path):
+            print(f"Could not inspect revision format, file missing: {file_path}")
+            return None
+
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
+                for line in fh:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    inspected_any = True
+                    if is_revision_header_line(stripped):
+                        return True
+        except OSError as ex:
+            print(f"Could not inspect revision format in {file_path}: {ex}")
+            return None
+
+    return False if inspected_any else None
+
+
 def detect_files_from_candidates(candidates):
     """Classify TXT files based on filename keywords and update loaded_files."""
     global loaded_files
@@ -709,6 +745,10 @@ def detect_files_from_candidates(candidates):
                 if key not in loaded_files:
                     loaded_files[key] = txt_path
                 break
+
+    detected_revision = detect_revision_selection()
+    if detected_revision is not None:
+        settings["revision_selection"] = detected_revision
 
 
 def finish_project_load(project_display_name, status_text):
