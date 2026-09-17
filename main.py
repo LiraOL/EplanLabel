@@ -901,7 +901,14 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
 
 def choose_revision_folder_format(parent):
     """Ask user which revision folder convention to use. Returns 'new', 'old', or None."""
-    owner = parent or root
+    owner = parent
+    if owner is None:
+        return None
+    try:
+        if not owner.winfo_exists():
+            return None
+    except tk.TclError:
+        return None
     dialog = RevisionFolderFormatDialog(owner, t("msg_revision_format_title"))
     return dialog.result
 
