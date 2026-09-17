@@ -85,7 +85,11 @@ translations = {
         "msg_drawings_missing_title": "Map ontbreekt",
         "msg_drawings_missing": "De map 'Tekeningen' is niet gevonden in: {project_path}",
         "msg_revision_missing_title": "Revisie ontbreekt",
-        "msg_revision_missing": "Geen revisiemappen gevonden (R###) in: {drawings_path}",
+        "msg_revision_missing": "Geen revisiemappen gevonden in: {drawings_path}",
+        "msg_revision_format_title": "Revisieversie kiezen",
+        "msg_revision_format_prompt": "Er zijn oude en nieuwe revisieversies gevonden.\nWelke wil je gebruiken?",
+        "revision_format_new": "Nieuwe versie",
+        "revision_format_old": "Oude versie",
         "msg_labels_missing_title": "Labels map ontbreekt",
         "msg_labels_missing": "De map 'labels' is niet gevonden in: {revision_path}",
         "msg_loaded_from_project": "Project geladen via nummer: {project_number} (revisie {revision_name})",
@@ -164,7 +168,11 @@ translations = {
         "msg_drawings_missing_title": "Folder missing",
         "msg_drawings_missing": "The folder 'Tekeningen' was not found in: {project_path}",
         "msg_revision_missing_title": "Revision missing",
-        "msg_revision_missing": "No revision folders found (R###) in: {drawings_path}",
+        "msg_revision_missing": "No revision folders found in: {drawings_path}",
+        "msg_revision_format_title": "Choose revision version",
+        "msg_revision_format_prompt": "Both old and new revision versions were found.\nWhich one should be used?",
+        "revision_format_new": "New version",
+        "revision_format_old": "Old version",
         "msg_labels_missing_title": "Labels folder missing",
         "msg_labels_missing": "The folder 'labels' was not found in: {revision_path}",
         "msg_loaded_from_project": "Project loaded by number: {project_number} (revision {revision_name})",
@@ -243,7 +251,11 @@ translations = {
         "msg_drawings_missing_title": "Falta carpeta",
         "msg_drawings_missing": "La carpeta 'Tekeningen' no se encontró en: {project_path}",
         "msg_revision_missing_title": "Falta revisión",
-        "msg_revision_missing": "No se encontraron carpetas de revisión (R###) en: {drawings_path}",
+        "msg_revision_missing": "No se encontraron carpetas de revisión en: {drawings_path}",
+        "msg_revision_format_title": "Elegir versión de revisión",
+        "msg_revision_format_prompt": "Se encontraron versiones de revisión antiguas y nuevas.\n¿Cuál quieres usar?",
+        "revision_format_new": "Versión nueva",
+        "revision_format_old": "Versión antigua",
         "msg_labels_missing_title": "Falta carpeta labels",
         "msg_labels_missing": "La carpeta 'labels' no se encontró en: {revision_path}",
         "msg_loaded_from_project": "Proyecto cargado por número: {project_number} (revisión {revision_name})",
@@ -827,15 +839,78 @@ def load_project_folder():
 # ============================================================
 # LOAD PROJECT BY NUMBER (NEW FEATURE)
 # ============================================================
-def parse_revision_number(folder_name):
-    """Return revision number from folder names like R1, R014, R123.
+REVISION_FOLDER_OLD_PATTERN = re.compile(r'^R(\d+)$', flags=re.IGNORECASE)
+REVISION_FOLDER_NEW_PATTERN = re.compile(r'^REVISIE\s+(\d+)$', flags=re.IGNORECASE)
 
-    If not a valid revision folder, returns None.
-    """
-    m = re.match(r'^R(\d+)$', folder_name.strip(), flags=re.IGNORECASE)
-    if not m:
+
+def parse_revision_folder(folder_name):
+    """Return (format, number) for supported revision folder names."""
+    stripped = folder_name.strip()
+
+    old_match = REVISION_FOLDER_OLD_PATTERN.match(stripped)
+    if old_match:
+        return "old", int(old_match.group(1))
+
+    new_match = REVISION_FOLDER_NEW_PATTERN.match(stripped)
+    if new_match:
+        return "new", int(new_match.group(1))
+
+    return None, None
+
+
+def parse_revision_number(folder_name):
+    """Return revision number for supported revision folder names."""
+    _, number = parse_revision_folder(folder_name)
+    return number
+
+
+class RevisionFolderFormatDialog(simpledialog.Dialog):
+    """Modal dialog to choose which revision folder convention to use."""
+
+    def __init__(self, parent, title, new_option_text, old_option_text):
+        self.new_option_text = new_option_text
+        self.old_option_text = old_option_text
+        super().__init__(parent, title)
+
+    def body(self, master):
+        self.result = None
+        self.choice_var = tk.StringVar(value="new")
+        ttk.Label(
+            master,
+            text=t("msg_revision_format_prompt"),
+            justify="left",
+            wraplength=360
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 8))
+        new_radio = ttk.Radiobutton(master, text=self.new_option_text, variable=self.choice_var, value="new")
+        new_radio.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 4))
+        ttk.Radiobutton(master, text=self.old_option_text, variable=self.choice_var, value="old").grid(
+            row=2, column=0, sticky="w", padx=10, pady=(0, 10)
+        )
+        return new_radio
+
+    def apply(self):
+        self.result = self.choice_var.get()
+
+
+def choose_revision_folder_format(parent, new_revision_name=None, old_revision_name=None):
+    """Ask user which revision folder convention to use. Returns 'new', 'old', or None."""
+    owner = parent
+    try:
+        if owner is None or not owner.winfo_exists():
+            owner = tk._default_root
+    except tk.TclError:
+        owner = tk._default_root
+    if owner is None:
         return None
-    return int(m.group(1))
+    new_option_text = t("revision_format_new")
+    old_option_text = t("revision_format_old")
+    if new_revision_name:
+        new_option_text = f"{new_option_text} ({new_revision_name})"
+    if old_revision_name:
+        old_option_text = f"{old_option_text} ({old_revision_name})"
+
+    dialog = RevisionFolderFormatDialog(owner, t("msg_revision_format_title"), new_option_text, old_option_text)
+    return dialog.result
 
 
 def find_project_folder_by_number(main_folder, project_number):
@@ -855,27 +930,39 @@ def find_project_folder_by_number(main_folder, project_number):
     return matches[0] if matches else None
 
 
-def find_latest_revision_folder(tekeningen_folder):
-    """Find highest numeric R### folder using numeric comparison."""
-    rev_candidates = []
+def find_latest_revision_folder(tekeningen_folder, parent=None):
+    """Find highest numeric revision folder, handling old/new folder conventions."""
+    rev_candidates = {"old": [], "new": []}
     try:
         for d in os.listdir(tekeningen_folder):
             full = os.path.join(tekeningen_folder, d)
             if not os.path.isdir(full):
                 continue
-            rev_num = parse_revision_number(d)
+            rev_format, rev_num = parse_revision_folder(d)
             if rev_num is not None:
-                rev_candidates.append((rev_num, d, full))
+                rev_candidates[rev_format].append((rev_num, d, full))
     except Exception:
-        return None, None
+        return None, None, False
 
-    if not rev_candidates:
-        return None, None
+    has_old = bool(rev_candidates["old"])
+    has_new = bool(rev_candidates["new"])
+    if not has_old and not has_new:
+        return None, None, False
 
-    # Numeric comparison exactly as requested.
-    rev_candidates.sort(key=lambda x: x[0])
-    latest_num, latest_name, latest_path = rev_candidates[-1]
-    return latest_name, latest_path
+    if has_old and has_new:
+        latest_old = max(rev_candidates["old"], key=lambda x: x[0])
+        latest_new = max(rev_candidates["new"], key=lambda x: x[0])
+        selected_format = choose_revision_folder_format(parent, latest_new[1], latest_old[1])
+        if selected_format not in ("new", "old"):
+            return None, None, True
+    elif has_new:
+        selected_format = "new"
+    else:
+        selected_format = "old"
+
+    rev_candidates[selected_format].sort(key=lambda x: x[0])
+    _, latest_name, latest_path = rev_candidates[selected_format][-1]
+    return latest_name, latest_path, False
 
 
 def load_project_by_number():
@@ -914,7 +1001,9 @@ def load_project_by_number():
         )
         return
 
-    revision_name, revision_path = find_latest_revision_folder(tekeningen_path)
+    revision_name, revision_path, revision_cancelled = find_latest_revision_folder(tekeningen_path, parent=root)
+    if revision_cancelled:
+        return
     if not revision_path:
         messagebox.showwarning(
             t("msg_revision_missing_title"),
