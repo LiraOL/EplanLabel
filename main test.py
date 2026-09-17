@@ -709,12 +709,12 @@ REVISION_HEADER_PATTERN = re.compile(r'\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
 STRUCTURED_REVISION_HEADER_PATTERN = re.compile(r'^\s*;{4}\s*[^;\s]', flags=re.IGNORECASE)
 
 
-def is_revision_header_line(line):
+def is_revision_header_line(line, allow_structured=True):
     """Return True when the line looks like a revision-aware label header."""
     stripped = line.strip()
     return bool(
         REVISION_HEADER_PATTERN.search(stripped)
-        or STRUCTURED_REVISION_HEADER_PATTERN.match(stripped)
+        or (allow_structured and STRUCTURED_REVISION_HEADER_PATTERN.match(stripped))
     )
 
 
@@ -722,7 +722,7 @@ def detect_revision_selection():
     """Return True for new format, False for old format, or None when detection fails."""
     inspected_any = False
 
-    for file_path in loaded_files.values():
+    for file_key, file_path in loaded_files.items():
         if not file_path:
             print("Could not inspect revision format: missing file path.")
             continue
@@ -737,7 +737,7 @@ def detect_revision_selection():
                     if not stripped:
                         continue
                     inspected_any = True
-                    if is_revision_header_line(stripped):
+                    if is_revision_header_line(stripped, allow_structured=(file_key != 'groep')):
                         return True
         except OSError as ex:
             print(f"Could not inspect revision format in {file_path}: {ex}")
