@@ -705,12 +705,17 @@ def generate_labels():
 # ============================================================
 # FILE DETECTION AND LOAD HELPERS
 # ============================================================
-REVISION_HEADER_PATTERN = re.compile(r'^\s*;{0,4}.*\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
+REVISION_HEADER_PATTERN = re.compile(r'\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
+STRUCTURED_REVISION_HEADER_PATTERN = re.compile(r'^\s*;{4}\s*[^;\s]', flags=re.IGNORECASE)
 
 
 def is_revision_header_line(line):
     """Return True when the line looks like a revision-aware label header."""
-    return bool(REVISION_HEADER_PATTERN.search(line.strip()))
+    stripped = line.strip()
+    return bool(
+        REVISION_HEADER_PATTERN.search(stripped)
+        or STRUCTURED_REVISION_HEADER_PATTERN.match(stripped)
+    )
 
 
 def detect_revision_selection():
