@@ -695,14 +695,15 @@ def is_revision_header_line(line):
 def detect_revision_selection():
     """Return True for new format, False for old format, or None when detection fails."""
     inspected_any = False
+    had_read_error = False
 
     for file_path in loaded_files.values():
         if not file_path:
             print("Could not inspect revision format: missing file path.")
-            return None
+            continue
         if not os.path.exists(file_path):
             print(f"Could not inspect revision format, file missing: {file_path}")
-            return None
+            continue
 
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
@@ -715,9 +716,11 @@ def detect_revision_selection():
                         return True
         except OSError as ex:
             print(f"Could not inspect revision format in {file_path}: {ex}")
-            return None
+            had_read_error = True
 
-    return False if inspected_any else None
+    if not inspected_any or had_read_error:
+        return None
+    return False
 
 
 def detect_files_from_candidates(candidates):
