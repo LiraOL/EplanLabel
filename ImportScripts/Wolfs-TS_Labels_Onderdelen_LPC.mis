@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<importscript version="3" creator="M-Print® PRO v. 9.10.2.0" last_modified="29.01.2025 15:21:06" page_numbering="0" page_numbering_format="23" split_into_subprojecttree="0" merge_same_marker_types="0">
+<variant matno="2711840000" catalogvariantalias="ESG-LP 6/15 MM WS" metallicard_inlay="1"><![CDATA[ESG-LP 6/15 MM WS]]></variant>
+<filter guid="B0836BB4-8DBE-4240-8579-FAC4A920A4DA">
+<fix>0</fix>
+<os>0</os>
+<quote/>
+<delimiter value="1" keep_delimiters="false">;</delimiter>
+<start_at>0</start_at>
+</filter>
+<sort column="-1" order="1"/>
+<extended_filter>
+<and_conjunction col_count="10">true</and_conjunction>
+<filter_items>
+<item col="1" expression="557"></item>
+<item col="0" expression="558"></item>
+</filter_items>
+</extended_filter>
+<counter column="-1" multiply="1"/>
+<mapping type="0" marker_row="1" col_LPCV2Product="3" check_LPCV2Product="0" col_LPCV2Reference1="4" check_LPCV2Reference1="0" col_LPCV2Reference2="5" check_LPCV2Reference2="0" col_LPCV2Reference3="6" check_LPCV2Reference3="0" col_LPCV2Reference4="7" check_LPCV2Reference4="0" col_LPCV2Reference5="3" check_LPCV2Reference5="0"/>
+<field name="MARKER" type="0" layer_id="2" layer_index="0" marker_row="1" link1="-1" text1="">
+<column special="0">1</column>
+</field>
+<importcount>1</importcount>
+</importscript>
+
+<!--SHA::bf548f06f983dd125cdc076bad25845f99a2c61be0388d4bf7d176d3caf0f8ec::-->
