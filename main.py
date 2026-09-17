@@ -965,9 +965,21 @@ def find_latest_revision_folder(tekeningen_folder, parent=None):
     return latest_name, latest_path, False
 
 
+def resolve_label_source_dir(revision_path):
+    """Return the folder that actually contains label TXT files for a revision."""
+    try:
+        for entry in os.listdir(revision_path):
+            full_path = os.path.join(revision_path, entry)
+            if os.path.isdir(full_path) and entry.strip().lower() == "labels":
+                return full_path
+    except OSError:
+        pass
+    return revision_path
+
+
 def load_project_by_number():
     """Load TXT files by project number using:
-    main folder -> <project startswith number> -> Tekeningen -> latest R### -> labels
+    main folder -> <project startswith number> -> Tekeningen -> latest revision -> labels/TXT
     """
     main_folder = settings.get("main_project_folder", "").strip()
     if not main_folder or not os.path.isdir(main_folder):
@@ -1011,18 +1023,18 @@ def load_project_by_number():
         )
         return
 
-    labels_path = os.path.join(revision_path, "labels")
-    if not os.path.isdir(labels_path):
+    labels_path = resolve_label_source_dir(revision_path)
+
+    # Collect txt files from the resolved labels source folder.
+    candidates = glob.glob(os.path.join(labels_path, "*R0*.txt"))
+    if not candidates:
+        candidates = glob.glob(os.path.join(labels_path, "*.txt"))
+    if not candidates:
         messagebox.showwarning(
             t("msg_labels_missing_title"),
             t("msg_labels_missing").format(revision_path=revision_path)
         )
         return
-
-    # Collect txt files from labels folder.
-    candidates = glob.glob(os.path.join(labels_path, "*R0*.txt"))
-    if not candidates:
-        candidates = glob.glob(os.path.join(labels_path, "*.txt"))
 
     detect_files_from_candidates(candidates)
 
