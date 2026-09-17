@@ -869,62 +869,33 @@ class RevisionFolderFormatDialog(simpledialog.Dialog):
 
     def body(self, master):
         self.result = None
+        self.choice_var = tk.StringVar(value="new")
         ttk.Label(
             master,
             text=t("msg_revision_format_prompt"),
             justify="left",
             wraplength=360
         ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 8))
-        return None
+        new_radio = ttk.Radiobutton(master, text=t("revision_format_new"), variable=self.choice_var, value="new")
+        new_radio.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 4))
+        ttk.Radiobutton(master, text=t("revision_format_old"), variable=self.choice_var, value="old").grid(
+            row=2, column=0, sticky="w", padx=10, pady=(0, 10)
+        )
+        return new_radio
 
-    def buttonbox(self):
-        box = ttk.Frame(self)
-
-        self.new_button = ttk.Button(box, text=t("revision_format_new"), command=self.choose_new)
-        self.new_button.pack(side="left", padx=(0, 8))
-        ttk.Button(box, text=t("revision_format_old"), command=self.choose_old).pack(side="left", padx=(0, 8))
-        ttk.Button(box, text=t("settings_cancel"), command=self.cancel).pack(side="right")
-
-        self.bind("<Escape>", lambda _event: self.cancel())
-        self.bind("<Return>", lambda _event: self.choose_new())
-        self.bind("<Tab>", self.focus_next_widget)
-        self.bind("<Shift-Tab>", self.focus_prev_widget)
-        self.bind("<ISO_Left_Tab>", self.focus_prev_widget)
-        box.pack(fill="x", padx=10, pady=(0, 10))
-        self.new_button.focus_set()
-
-    def choose_new(self):
-        self.result = "new"
-        self.destroy()
-
-    def choose_old(self):
-        self.result = "old"
-        self.destroy()
-
-    def focus_next_widget(self, _event):
-        current = self.focus_get()
-        next_widget = current.tk_focusNext() if current is not None else self.new_button
-        if next_widget is not None:
-            next_widget.focus_set()
-        return "break"
-
-    def focus_prev_widget(self, _event):
-        current = self.focus_get()
-        prev_widget = current.tk_focusPrev() if current is not None else self.new_button
-        if prev_widget is not None:
-            prev_widget.focus_set()
-        return "break"
+    def apply(self):
+        self.result = self.choice_var.get()
 
 
 def choose_revision_folder_format(parent):
     """Ask user which revision folder convention to use. Returns 'new', 'old', or None."""
     owner = parent
-    if owner is None:
-        return None
     try:
-        if not owner.winfo_exists():
-            return None
+        if owner is None or not owner.winfo_exists():
+            owner = tk._default_root
     except tk.TclError:
+        owner = tk._default_root
+    if owner is None:
         return None
     dialog = RevisionFolderFormatDialog(owner, t("msg_revision_format_title"))
     return dialog.result
