@@ -71,6 +71,7 @@ translations = {
         "settings_main_folder": "Hoofdprojectmap:",
         "settings_browse": "Bladeren...",
         "settings_legacy_selection": "Legacy-selectie activeren",
+        "settings_revision_selection": "Legacy-revisie activeren",
         "settings_save": "Opslaan",
         "settings_cancel": "Annuleren",
         "settings_saved": "Instellingen opgeslagen.",
@@ -149,6 +150,7 @@ translations = {
         "settings_main_folder": "Main project folder:",
         "settings_browse": "Browse...",
         "settings_legacy_selection": "Enable legacy selection",
+        "settings_revision_selection": "Enable legacy revision",
         "settings_save": "Save",
         "settings_cancel": "Cancel",
         "settings_saved": "Settings saved.",
@@ -227,6 +229,7 @@ translations = {
         "settings_main_folder": "Carpeta principal de proyectos:",
         "settings_browse": "Examinar...",
         "settings_legacy_selection": "Activar selección heredada",
+        "settings_revision_selection": "Activar version R10",
         "settings_save": "Guardar",
         "settings_cancel": "Cancelar",
         "settings_saved": "Ajustes guardados.",
@@ -325,6 +328,7 @@ chk_use_filter = None
 btn_detect = None
 selection_mode_frame = None
 legacy_options_frame = None
+revision_selection_var = None
 
 project_loaded = False
 
@@ -333,6 +337,17 @@ project_loaded = False
 # SETTINGS HELPERS
 # ============================================================
 # These functions handle loading/saving the app configuration.
+def set_revision_selection(value):
+    """Update the active revision-selection setting and any live UI variable."""
+    global revision_selection_var
+    settings["revision_selection"] = bool(value)
+    if revision_selection_var is not None:
+        try:
+            revision_selection_var.set(settings["revision_selection"])
+        except tk.TclError:
+            revision_selection_var = None
+
+
 def load_settings_from_disk():
     """Load settings.json if present. If invalid/missing, keep defaults."""
     global settings
@@ -346,6 +361,7 @@ def load_settings_from_disk():
         if isinstance(data, dict):
             settings["main_project_folder"] = str(data.get("main_project_folder", "")).strip()
             settings["legacy_selection"] = bool(data.get("legacy_selection", False))
+            set_revision_selection(data.get("revision_selection", False))
     except Exception as ex:
         print("Could not load settings:", ex)
 
@@ -362,10 +378,11 @@ def save_settings_to_disk():
 
 def open_settings_window():
     """Open a small modal settings window to edit the main project folder."""
+    global revision_selection_var
     win = tk.Toplevel(root)
     win.title(t("settings_title"))
-    win.geometry("720x170")
-    win.minsize(600, 150)
+    win.geometry("720x210")
+    win.minsize(600, 180)
     win.transient(root)
     win.grab_set()
 
@@ -390,16 +407,29 @@ def open_settings_window():
     legacy_chk = ttk.Checkbutton(container, text=t("settings_legacy_selection"), variable=legacy_var)
     legacy_chk.grid(row=2, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
+    revision_var = tk.BooleanVar(value=settings.get("revision_selection", False))
+    revision_selection_var = revision_var
+    revision_chk = ttk.Checkbutton(container, text=t("settings_revision_selection"), variable=revision_var)
+    revision_chk.grid(row=3, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
     def do_save():
         settings["main_project_folder"] = folder_var.get().strip()
         settings["legacy_selection"] = legacy_var.get()
+        set_revision_selection(revision_var.get())
         save_settings_to_disk()
         apply_selection_mode_ui()
         messagebox.showinfo(t("settings_title"), t("settings_saved"))
         win.destroy()
 
+    def clear_revision_selection_var(_event=None):
+        global revision_selection_var
+        if revision_selection_var is revision_var:
+            revision_selection_var = None
+
+    win.bind("<Destroy>", clear_revision_selection_var)
+
     btns = tk.Frame(container)
-    btns.grid(row=3, column=0, columnspan=2, sticky="e", pady=(14, 0))
+    btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
     ttk.Button(btns, text=t("settings_cancel"), command=win.destroy).pack(side=tk.RIGHT, padx=(8, 0))
     ttk.Button(btns, text=t("settings_save"), command=do_save).pack(side=tk.RIGHT)
@@ -533,7 +563,7 @@ def detect_and_update_panels():
             with open(groep_path, 'r', encoding='utf-8', errors='ignore') as fh:
                 for ln in fh:
                     p = ln.strip()
-                    if p and 2 <= len(p) <= 25:
+                    if p and 2 <= len(p) <= 25 and not is_revision_header_line(p):
                         panel_set.add(p)
         except Exception as ex:
             print("Error reading Groepscode file:", ex)
@@ -558,43 +588,77 @@ def generate_labels():
         return
 
     jobs = []
+    use_r10 = settings.get("revision_selection", False)
+
+    def add_revision_job(selected, display_name, src_key, old_mis, new_mis, direct=False):
+        if selected and loaded_files.get(src_key):
+            jobs.append((display_name, src_key, new_mis if use_r10 else old_mis, direct))
+
     if settings.get("legacy_selection", False):
         if var_groep.get() and loaded_files.get('groep'):
             jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
-        if var_onderdelen.get() and loaded_files.get('onderdelen'):
-            jobs.append(("Onderdelen", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen.mis", False))
-        if var_onderdelen_lpc.get() and loaded_files.get('onderdelen'):
-            jobs.append(("Onderdelen LPC", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen_LPC.mis", True))
+
+        add_revision_job(var_onderdelen.get(), "Onderdelen", "onderdelen",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen R10.mis")
+
+        add_revision_job(var_onderdelen_lpc.get(), "Onderdelen LPC", "onderdelen",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen_LPC.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen_LPC.mis",
+                         True)
+
         if var_onderdelen_lbl.get() and loaded_files.get('onderdelen'):
             jobs.append(("Onderdelen Label", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen_VolgensLabelR02.mis", False))
         if var_onderdelen_tw.get() and loaded_files.get('onderdelen'):
             jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
-        if var_legends.get() and loaded_files.get('legends'):
-            jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis", False))
-        if var_klemmenstrook.get() and loaded_files.get('klemmenstrook'):
-            jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis", False))
-        if var_klemmen.get() and loaded_files.get('klemmen'):
-            jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis", False))
-        if var_kab10.get() and loaded_files.get('kabels'):
-            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis", False))
-        if var_kab100.get() and loaded_files.get('kabels'):
-            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis", False))
+
+        add_revision_job(var_legends.get(), "Legends", "legends",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis")
+
+        add_revision_job(var_klemmenstrook.get(), "Klemmenstrook", "klemmenstrook",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis")
+
+        add_revision_job(var_klemmen.get(), "Klemmen", "klemmen",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis")
+
+        add_revision_job(var_kab10.get(), "Kabels 0-10mm", "kabels",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis")
+
+        add_revision_job(var_kab100.get(), "Kabels 10-100mm", "kabels",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis")
     else:
         if var_cabinet_markers.get():
             if loaded_files.get('groep'):
                 jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
-            if loaded_files.get('legends'):
-                jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis", False))
+
+            add_revision_job(True, "Legends", "legends",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis")
+
         if var_component_markers.get() and loaded_files.get('onderdelen'):
             jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
+
         if var_terminal_markers.get():
-            if loaded_files.get('klemmenstrook'):
-                jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis", False))
-            if loaded_files.get('klemmen'):
-                jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis", False))
-        if var_cable_markers.get() and loaded_files.get('kabels'):
-            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis", False))
-            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis", False))
+            add_revision_job(True, "Klemmenstrook", "klemmenstrook",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis")
+
+            add_revision_job(True, "Klemmen", "klemmen",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis")
+
+        if var_cable_markers.get():
+            add_revision_job(True, "Kabels 0-10mm", "kabels",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis")
+            add_revision_job(True, "Kabels 10-100mm", "kabels",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis")
 
     if not jobs:
         messagebox.showinfo(t("msg_nothing_selected"), t("msg_select_at_least_one"))
@@ -639,6 +703,52 @@ def generate_labels():
 # ============================================================
 # FILE DETECTION AND LOAD HELPERS
 # ============================================================
+REVISION_HEADER_PATTERN = re.compile(r'\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
+STRUCTURED_REVISION_HEADER_PATTERN = re.compile(r'^\s*;{4}\s*[^;\s]', flags=re.IGNORECASE)
+LABEL_FILE_KEYS = ('groep', 'kabels', 'klemmenstrook', 'klemmen', 'legends', 'onderdelen')
+
+
+def is_revision_header_line(line, allow_structured=True):
+    """Return True when the line looks like a revision-aware label header."""
+    stripped = line.strip()
+    return bool(
+        REVISION_HEADER_PATTERN.search(stripped)
+        or (allow_structured and STRUCTURED_REVISION_HEADER_PATTERN.match(stripped))
+    )
+
+
+def detect_revision_selection():
+    """Return True for new format, False for old format, or None when detection fails."""
+    inspected_any = False
+
+    for file_key in LABEL_FILE_KEYS:
+        if file_key not in loaded_files:
+            continue
+        file_path = loaded_files.get(file_key)
+        if not file_path:
+            print("Could not inspect revision format: missing file path.")
+            continue
+        if not os.path.exists(file_path):
+            print(f"Could not inspect revision format, file missing: {file_path}")
+            continue
+
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
+                for line in fh:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    inspected_any = True
+                    if is_revision_header_line(stripped, allow_structured=(file_key != 'groep')):
+                        return True
+        except OSError as ex:
+            print(f"Could not inspect revision format in {file_path}: {ex}")
+
+    if not inspected_any:
+        return None
+    return False
+
+
 def detect_files_from_candidates(candidates):
     """Classify TXT files based on filename keywords and update loaded_files."""
     global loaded_files
@@ -664,6 +774,10 @@ def detect_files_from_candidates(candidates):
                 if key not in loaded_files:
                     loaded_files[key] = txt_path
                 break
+
+    detected_revision = detect_revision_selection()
+    if detected_revision is not None:
+        set_revision_selection(detected_revision)
 
 
 def finish_project_load(project_display_name, status_text):

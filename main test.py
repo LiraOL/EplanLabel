@@ -330,6 +330,7 @@ btn_detect = None
 selection_mode_frame = None
 legacy_options_frame = None
 revision_options_frame = None
+revision_selection_var = None
 
 project_loaded = False
 
@@ -338,6 +339,17 @@ project_loaded = False
 # SETTINGS HELPERS
 # ============================================================
 # These functions handle loading/saving the app configuration.
+def set_revision_selection(value):
+    """Update the active revision-selection setting and any live UI variable."""
+    global revision_selection_var
+    settings["revision_selection"] = bool(value)
+    if revision_selection_var is not None:
+        try:
+            revision_selection_var.set(settings["revision_selection"])
+        except tk.TclError:
+            revision_selection_var = None
+
+
 def load_settings_from_disk():
     """Load settings.json if present. If invalid/missing, keep defaults."""
     global settings
@@ -368,10 +380,11 @@ def save_settings_to_disk():
 
 def open_settings_window():
     """Open a small modal settings window to edit the main project folder."""
+    global revision_selection_var
     win = tk.Toplevel(root)
     win.title(t("settings_title"))
-    win.geometry("720x170")
-    win.minsize(600, 150)
+    win.geometry("720x210")
+    win.minsize(600, 180)
     win.transient(root)
     win.grab_set()
 
@@ -397,20 +410,28 @@ def open_settings_window():
     legacy_chk.grid(row=2, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
     revision_var = tk.BooleanVar(value=settings.get("revision_selection", False))
+    revision_selection_var = revision_var
     revision_chk = ttk.Checkbutton(container, text=t("settings_revision_selection"), variable=revision_var)
     revision_chk.grid(row=3, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
     def do_save():
         settings["main_project_folder"] = folder_var.get().strip()
         settings["legacy_selection"] = legacy_var.get()
-        settings["revision_selection"] = revision_var.get()
+        set_revision_selection(revision_var.get())
         save_settings_to_disk()
         apply_selection_mode_ui()
         messagebox.showinfo(t("settings_title"), t("settings_saved"))
         win.destroy()
 
+    def clear_revision_selection_var(_event=None):
+        global revision_selection_var
+        if revision_selection_var is revision_var:
+            revision_selection_var = None
+
+    win.bind("<Destroy>", clear_revision_selection_var)
+
     btns = tk.Frame(container)
-    btns.grid(row=3, column=0, columnspan=2, sticky="e", pady=(14, 0))
+    btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
     ttk.Button(btns, text=t("settings_cancel"), command=win.destroy).pack(side=tk.RIGHT, padx=(8, 0))
     ttk.Button(btns, text=t("settings_save"), command=do_save).pack(side=tk.RIGHT)
@@ -544,7 +565,7 @@ def detect_and_update_panels():
             with open(groep_path, 'r', encoding='utf-8', errors='ignore') as fh:
                 for ln in fh:
                     p = ln.strip()
-                    if p and 2 <= len(p) <= 25:
+                    if p and 2 <= len(p) <= 25 and not is_revision_header_line(p):
                         panel_set.add(p)
         except Exception as ex:
             print("Error reading Groepscode file:", ex)
@@ -684,6 +705,52 @@ def generate_labels():
 # ============================================================
 # FILE DETECTION AND LOAD HELPERS
 # ============================================================
+REVISION_HEADER_PATTERN = re.compile(r'\bREVISIE\s+\d+\b', flags=re.IGNORECASE)
+STRUCTURED_REVISION_HEADER_PATTERN = re.compile(r'^\s*;{4}\s*[^;\s]', flags=re.IGNORECASE)
+LABEL_FILE_KEYS = ('groep', 'kabels', 'klemmenstrook', 'klemmen', 'legends', 'onderdelen')
+
+
+def is_revision_header_line(line, allow_structured=True):
+    """Return True when the line looks like a revision-aware label header."""
+    stripped = line.strip()
+    return bool(
+        REVISION_HEADER_PATTERN.search(stripped)
+        or (allow_structured and STRUCTURED_REVISION_HEADER_PATTERN.match(stripped))
+    )
+
+
+def detect_revision_selection():
+    """Return True for new format, False for old format, or None when detection fails."""
+    inspected_any = False
+
+    for file_key in LABEL_FILE_KEYS:
+        if file_key not in loaded_files:
+            continue
+        file_path = loaded_files.get(file_key)
+        if not file_path:
+            print("Could not inspect revision format: missing file path.")
+            continue
+        if not os.path.exists(file_path):
+            print(f"Could not inspect revision format, file missing: {file_path}")
+            continue
+
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
+                for line in fh:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    inspected_any = True
+                    if is_revision_header_line(stripped, allow_structured=(file_key != 'groep')):
+                        return True
+        except OSError as ex:
+            print(f"Could not inspect revision format in {file_path}: {ex}")
+
+    if not inspected_any:
+        return None
+    return False
+
+
 def detect_files_from_candidates(candidates):
     """Classify TXT files based on filename keywords and update loaded_files."""
     global loaded_files
@@ -709,6 +776,10 @@ def detect_files_from_candidates(candidates):
                 if key not in loaded_files:
                     loaded_files[key] = txt_path
                 break
+
+    detected_revision = detect_revision_selection()
+    if detected_revision is not None:
+        set_revision_selection(detected_revision)
 
 
 def finish_project_load(project_display_name, status_text):
