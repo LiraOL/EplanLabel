@@ -568,19 +568,24 @@ def generate_labels():
         messagebox.showwarning(t("msg_no_files"), t("msg_select_folder_first"))
         return
     jobs = []
+    use_r10 = settings.get("revision_selection", False)
+
+    def add_revision_job(selected, display_name, src_key, old_mis, new_mis, direct=False):
+        if selected and loaded_files.get(src_key):
+            jobs.append((display_name, src_key, new_mis if use_r10 else old_mis, direct))
+
     if settings.get("legacy_selection", False):
         if var_groep.get() and loaded_files.get('groep'):
             jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
 
-        if var_onderdelen.get() and loaded_files.get('onderdelen') and settings.get("revision_selection", False):
-            jobs.append(("Onderdelen", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen.mis", False))
-        if var_onderdelen.get() and loaded_files.get('onderdelen') and settings.get("revision_selection", True):
-            jobs.append(("Onderdelen", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen R10.mis", False))
+        add_revision_job(var_onderdelen.get(), "Onderdelen", "onderdelen",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen R10.mis")
 
-        if var_onderdelen_lpc.get() and loaded_files.get('onderdelen') and settings.get("revision_selection", False):
-            jobs.append(("Onderdelen LPC", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen_LPC.mis", True))
-        if var_onderdelen_lpc.get() and loaded_files.get('onderdelen') and settings.get("revision_selection", True):
-            jobs.append(("Onderdelen LPC", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen R10.mis", True))
+        add_revision_job(var_onderdelen_lpc.get(), "Onderdelen LPC", "onderdelen",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Onderdelen_LPC.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen_LPC.mis",
+                         True)
 
         if var_onderdelen_lbl.get() and loaded_files.get('onderdelen'):
             jobs.append(("Onderdelen Label", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Onderdelen_VolgensLabelR02.mis", False))
@@ -588,59 +593,52 @@ def generate_labels():
         if var_onderdelen_tw.get() and loaded_files.get('onderdelen'):
             jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
 
-        if var_legends.get() and loaded_files.get('legends') and settings.get("revision_selection", False):
-            jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis", False))
-        if var_legends.get() and loaded_files.get('legends') and settings.get("revision_selection", True):
-            jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis", False))
+        add_revision_job(var_legends.get(), "Legends", "legends",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis")
 
-        if var_klemmenstrook.get() and loaded_files.get('klemmenstrook') and settings.get("revision_selection", False):
-            jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis", False))
-        if var_klemmenstrook.get() and loaded_files.get('klemmenstrook') and settings.get("revision_selection", True):
-            jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis", False))
+        add_revision_job(var_klemmenstrook.get(), "Klemmenstrook", "klemmenstrook",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis")
 
-        if var_klemmen.get() and loaded_files.get('klemmen') and settings.get("revision_selection", False):
-            jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis", False))
-        if var_klemmen.get() and loaded_files.get('klemmen') and settings.get("revision_selection", True):
-            jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis", False))
+        add_revision_job(var_klemmen.get(), "Klemmen", "klemmen",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis")
 
-        if var_kab10.get() and loaded_files.get('kabels') and settings.get("revision_selection", False):
-            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis", False))
-        if var_kab10.get() and loaded_files.get('kabels') and settings.get("revision_selection", True):
-            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis", False))
+        add_revision_job(var_kab10.get(), "Kabels 0-10mm", "kabels",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis")
 
-        if var_kab100.get() and loaded_files.get('kabels') and settings.get("revision_selection", False):
-            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis", False))
-        if var_kab100.get() and loaded_files.get('kabels') and settings.get("revision_selection", True):
-            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis", False))
+        add_revision_job(var_kab100.get(), "Kabels 10-100mm", "kabels",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis",
+                         r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis")
     else:
         if var_cabinet_markers.get():
             if loaded_files.get('groep'):
                 jobs.append(("Groepscode", "groep", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Groepcode.mis", False))
-            if loaded_files.get('legends') and settings.get("revision_selection", False):
-                jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis", False))
-            if loaded_files.get('legends')  and settings.get("revision_selection", True):
-                jobs.append(("Legends", "legends", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis", False))
+            add_revision_job(True, "Legends", "legends",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Legends R10.mis")
 
         if var_component_markers.get() and loaded_files.get('onderdelen'):
             jobs.append(("Onderdelen Tech", "onderdelen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_OnderdelenR02.mis", False))
 
         if var_terminal_markers.get():
-            if loaded_files.get('klemmenstrook') and settings.get("revision_selection", False):
-                jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis", False))
-            if loaded_files.get('klemmenstrook') and settings.get("revision_selection", True):
-                jobs.append(("Klemmenstrook", "klemmenstrook", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis", False))
+            add_revision_job(True, "Klemmenstrook", "klemmenstrook",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klemmenstrook R10.mis")
 
-            if loaded_files.get('klemmen') and settings.get("revision_selection", False):
-                jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis", False))
-            if loaded_files.get('klemmen') and settings.get("revision_selection", True):
-                jobs.append(("Klemmen", "klemmen", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis", False))
+            add_revision_job(True, "Klemmen", "klemmen",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Klem R10.mis")
 
-        if var_cable_markers.get() and loaded_files.get('kabels') and settings.get("revision_selection", False):
-            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis", False))
-            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis", False))
-        if var_cable_markers.get() and loaded_files.get('kabels') and settings.get("revision_selection", True):
-            jobs.append(("Kabels 0-10mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis", False))
-            jobs.append(("Kabels 10-100mm", "kabels", r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis", False))
+        if var_cable_markers.get():
+            add_revision_job(True, "Kabels 0-10mm", "kabels",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 0-10mm R10.mis")
+            add_revision_job(True, "Kabels 10-100mm", "kabels",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm.mis",
+                             r"C:\Users\werkplaats\projects\Eplan-Label\ImportScripts\Wolfs-TS_Labels_Kabels 10-100 mm R10.mis")
 
 
     if not jobs:
