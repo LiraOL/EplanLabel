@@ -953,7 +953,7 @@ def find_latest_revision_folder(tekeningen_folder, parent=None):
         latest_old = max(rev_candidates["old"], key=lambda x: x[0])
         latest_new = max(rev_candidates["new"], key=lambda x: x[0])
         selected_format = choose_revision_folder_format(parent, latest_new[1], latest_old[1])
-        if selected_format is None:
+        if selected_format not in ("new", "old"):
             return None, None, True
     elif has_new:
         selected_format = "new"
