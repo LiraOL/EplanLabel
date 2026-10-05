@@ -101,12 +101,14 @@ Settings are stored in `settings.json` next to `main.py`:
 ```json
 {
   "main_project_folder": "/path/to/projects",
-  "legacy_selection": false
+  "legacy_selection": false,
+  "debug_filter_output": false
 }
 ```
 
 - **main_project_folder:** Root directory containing all EPLAN projects
 - **legacy_selection:** Enable/disable legacy UI mode
+- **debug_filter_output:** Save a TEMP debug report that shows which lines were kept or removed during filtering
 
 ## Features in Detail
 
@@ -116,6 +118,10 @@ The tool automatically filters:
 - Empty lines
 - Blank marker rows (lines containing only semicolons)
 - Lines with minimal content
+
+### Debug Filter Output
+
+Enable **Save debug filter output** in Settings to write a readable report in the system TEMP folder. The report lists which lines were kept, which lines were deleted, and the reason for each deletion.
 
 ### Panel Detection
 

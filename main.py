@@ -9,6 +9,7 @@ import os
 import subprocess
 import glob
 import re
+import hashlib
 import tempfile
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox, simpledialog
@@ -56,6 +57,7 @@ translations = {
         "msg_select_at_least_one": "Selecteer minstens één type label.",
         "msg_done_title": "Proces voltooid",
         "msg_done_body": "{launched} van {total} MPrintPRO processen gestart.\n\nFilter op kasten: {filter_text}",
+        "msg_debug_reports_saved": "Debugrapporten opgeslagen in TEMP:\n{debug_files}",
         "msg_filter_no_results": "Geen regels gevonden",
         "msg_filter_fallback": "Geen regels gevonden voor de geselecteerde kasten.\nHet volledige bestand wordt gebruikt.",
         "filter_yes": "Ja",
@@ -72,6 +74,7 @@ translations = {
         "settings_browse": "Bladeren...",
         "settings_legacy_selection": "Legacy-selectie activeren",
         "settings_revision_selection": "Legacy-revisie activeren",
+        "settings_debug_filter": "Debug filter-uitvoer opslaan",
         "settings_save": "Opslaan",
         "settings_cancel": "Annuleren",
         "settings_saved": "Instellingen opgeslagen.",
@@ -139,6 +142,7 @@ translations = {
         "msg_select_at_least_one": "Select at least one label type.",
         "msg_done_title": "Process completed",
         "msg_done_body": "{launched} of {total} MPrintPRO processes started.\n\nPanel filter: {filter_text}",
+        "msg_debug_reports_saved": "Debug reports saved in TEMP:\n{debug_files}",
         "msg_filter_no_results": "No lines found",
         "msg_filter_fallback": "No lines found for the selected panels.\nThe full file will be used.",
         "filter_yes": "Yes",
@@ -155,6 +159,7 @@ translations = {
         "settings_browse": "Browse...",
         "settings_legacy_selection": "Enable legacy selection",
         "settings_revision_selection": "Enable legacy revision",
+        "settings_debug_filter": "Save debug filter output",
         "settings_save": "Save",
         "settings_cancel": "Cancel",
         "settings_saved": "Settings saved.",
@@ -222,6 +227,7 @@ translations = {
         "msg_select_at_least_one": "Selecciona al menos un tipo de etiqueta.",
         "msg_done_title": "Proceso completado",
         "msg_done_body": "Se lanzaron {launched} de {total} procesos de MPrintPRO.\n\nFiltro de cuadros: {filter_text}",
+        "msg_debug_reports_saved": "Informes de depuración guardados en TEMP:\n{debug_files}",
         "msg_filter_no_results": "Sin resultados",
         "msg_filter_fallback": "No se encontraron líneas para los cuadros seleccionados.\nSe usará el archivo completo.",
         "filter_yes": "Sí",
@@ -238,6 +244,7 @@ translations = {
         "settings_browse": "Examinar...",
         "settings_legacy_selection": "Activar selección heredada",
         "settings_revision_selection": "Activar version R10",
+        "settings_debug_filter": "Guardar salida de depuración del filtro",
         "settings_save": "Guardar",
         "settings_cancel": "Cancelar",
         "settings_saved": "Ajustes guardados.",
@@ -294,6 +301,7 @@ settings = {
     "main_project_folder": "",
     "legacy_selection": False,
     "revision_selection": False,
+    "debug_filter_output": False,
 }
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
@@ -345,6 +353,7 @@ revision_options_frame = None
 revision_selection_var = None
 
 project_loaded = False
+last_filter_debug_reports = []
 
 
 # ============================================================
@@ -376,6 +385,7 @@ def load_settings_from_disk():
             settings["main_project_folder"] = str(data.get("main_project_folder", "")).strip()
             settings["legacy_selection"] = bool(data.get("legacy_selection", False))
             settings["revision_selection"] = bool(data.get("revision_selection", False))
+            settings["debug_filter_output"] = bool(data.get("debug_filter_output", False))
     except Exception as ex:
         print("Could not load settings:", ex)
 
@@ -395,8 +405,8 @@ def open_settings_window():
     global revision_selection_var
     win = tk.Toplevel(root)
     win.title(t("settings_title"))
-    win.geometry("720x210")
-    win.minsize(600, 180)
+    win.geometry("720x250")
+    win.minsize(600, 220)
     win.transient(root)
     win.grab_set()
 
@@ -426,10 +436,15 @@ def open_settings_window():
     revision_chk = ttk.Checkbutton(container, text=t("settings_revision_selection"), variable=revision_var)
     revision_chk.grid(row=3, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
+    debug_var = tk.BooleanVar(value=settings.get("debug_filter_output", False))
+    debug_chk = ttk.Checkbutton(container, text=t("settings_debug_filter"), variable=debug_var)
+    debug_chk.grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
     def do_save():
         settings["main_project_folder"] = folder_var.get().strip()
         settings["legacy_selection"] = legacy_var.get()
         set_revision_selection(revision_var.get())
+        settings["debug_filter_output"] = debug_var.get()
         save_settings_to_disk()
         apply_selection_mode_ui()
         messagebox.showinfo(t("settings_title"), t("settings_saved"))
@@ -443,7 +458,7 @@ def open_settings_window():
     win.bind("<Destroy>", clear_revision_selection_var)
 
     btns = tk.Frame(container)
-    btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
+    btns.grid(row=5, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
     ttk.Button(btns, text=t("settings_cancel"), command=win.destroy).pack(side=tk.RIGHT, padx=(8, 0))
     ttk.Button(btns, text=t("settings_save"), command=do_save).pack(side=tk.RIGHT)
@@ -506,56 +521,79 @@ def create_filtered_temp(source_path, selected_panels):
     - If selected_panels is not empty, keeps only lines that match those panels.
     - Falls back to original file on read/write errors.
     """
-    if not selected_panels:
-        try:
-            with open(source_path, 'r', encoding='utf-8', errors='ignore') as f:
-                all_lines = f.readlines()
+    def line_decision(line):
+        stripped = line.strip()
+        if not stripped or stripped.replace(';', '').strip() == '':
+            return False, "empty-or-blank-marker"
+        if stripped.count(';') >= 6 and len(stripped.replace(';', '').strip()) < 8:
+            return False, "short-marker-content"
+        if not selected_panels:
+            return True, "kept"
 
-            keep_lines = []
-            for line in all_lines:
-                stripped = line.strip()
-                if not stripped or stripped.replace(';', '').strip() == '':
-                    continue
-                if stripped.count(';') >= 6 and len(stripped.replace(';', '').strip()) < 8:
-                    continue
-                keep_lines.append(line)
+        line_u = stripped.upper()
+        for pan in selected_panels:
+            if re.search(rf'(^|[;+= \t]){re.escape(pan.upper())}($|[; \t\n])', line_u):
+                return True, f"matched-panel:{pan}"
+        return False, "panel-not-selected"
 
-            tmp_path = os.path.join(tempfile.gettempdir(), "eplan_labels_filtered.txt")
-            with open(tmp_path, 'w', encoding='utf-8', errors='ignore') as f:
-                f.writelines(keep_lines)
-            return tmp_path
-        except Exception:
-            return source_path
+    def build_temp_paths():
+        source_name = os.path.splitext(os.path.basename(source_path))[0]
+        safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', source_name).strip('_') or "labels"
+        digest_input = f"{source_path}|{'|'.join(selected_panels)}"
+        digest = hashlib.sha1(digest_input.encode('utf-8', errors='ignore')).hexdigest()[:8]
+        base_path = os.path.join(tempfile.gettempdir(), f"eplan_labels_{safe_name}_{digest}")
+        return f"{base_path}_filtered.txt", f"{base_path}_debug.txt"
+
+    def write_debug_report(debug_path, filtered_path, debug_entries, kept_count):
+        global last_filter_debug_reports
+        if not settings.get("debug_filter_output", False):
+            return
+
+        selected_text = ", ".join(selected_panels) if selected_panels else "(none)"
+        deleted_count = sum(1 for entry in debug_entries if not entry["kept"])
+        with open(debug_path, 'w', encoding='utf-8', errors='ignore') as dbg:
+            dbg.write("Eplan Label Debug Filter Report\n")
+            dbg.write(f"Source file: {source_path}\n")
+            dbg.write(f"Filtered file: {filtered_path}\n")
+            dbg.write(f"Selected panels: {selected_text}\n")
+            dbg.write(f"Kept lines: {kept_count}\n")
+            dbg.write(f"Deleted lines: {deleted_count}\n")
+            dbg.write("\n")
+            for entry in debug_entries:
+                status = "KEPT" if entry["kept"] else "DELETED"
+                dbg.write(
+                    f"{status} | line {entry['line_number']} | {entry['reason']} | {entry['text']}\n"
+                )
+
+        if debug_path not in last_filter_debug_reports:
+            last_filter_debug_reports.append(debug_path)
 
     try:
         with open(source_path, 'r', encoding='utf-8', errors='ignore') as f:
             all_lines = f.readlines()
 
         keep_lines = []
-        for line in all_lines:
-            stripped = line.strip()
-            if not stripped or stripped.replace(';', '').strip() == '':
-                continue
-            if stripped.count(';') >= 6 and len(stripped.replace(';', '').strip()) < 8:
-                continue
-
-            line_u = stripped.upper()
-            match = False
-            for pan in selected_panels:
-                if re.search(rf'(^|[;+= \t]){re.escape(pan.upper())}($|[; \t\n])', line_u):
-                    match = True
-                    break
-            if match:
+        debug_entries = []
+        for index, line in enumerate(all_lines, start=1):
+            keep_line, reason = line_decision(line)
+            debug_entries.append({
+                "line_number": index,
+                "kept": keep_line,
+                "reason": reason,
+                "text": line.rstrip('\n\r'),
+            })
+            if keep_line:
                 keep_lines.append(line)
 
-        if len(keep_lines) == 0:
+        tmp_path, debug_path = build_temp_paths()
+        if selected_panels and len(keep_lines) == 0:
+            write_debug_report(debug_path, source_path, debug_entries, len(keep_lines))
             messagebox.showwarning(t("msg_filter_no_results"), t("msg_filter_fallback"))
             return source_path
 
-        tmp_path = os.path.join(tempfile.gettempdir(), "eplan_labels_filtered.txt")
         with open(tmp_path, 'w', encoding='utf-8', errors='ignore') as f:
             f.writelines(keep_lines)
-
+        write_debug_report(debug_path, tmp_path, debug_entries, len(keep_lines))
         return tmp_path
 
     except Exception:
@@ -597,9 +635,11 @@ def detect_and_update_panels():
 # ============================================================
 def generate_labels():
     """Build selected jobs and launch one MPrintPRO process per selected label type."""
+    global last_filter_debug_reports
     if not loaded_files:
         messagebox.showwarning(t("msg_no_files"), t("msg_select_folder_first"))
         return
+    last_filter_debug_reports = []
     jobs = []
     use_r10 = settings.get("revision_selection", False)
 
@@ -692,7 +732,7 @@ def generate_labels():
         if not src:
             continue
 
-        work_file = create_filtered_temp(src, sel_panels) if use_filter else src
+        work_file = create_filtered_temp(src, sel_panels) if (use_filter or settings.get("debug_filter_output", False)) else src
         tempname = str(work_file).replace('/', '\\')
 
         try:
@@ -711,6 +751,11 @@ def generate_labels():
     messagebox.showinfo(
         t("msg_done_title"),
         t("msg_done_body").format(launched=launched, total=len(jobs), filter_text=filter_text)
+        + (
+            "\n\n" + t("msg_debug_reports_saved").format(debug_files="\n".join(last_filter_debug_reports[:3]))
+            + ("\n..." if len(last_filter_debug_reports) > 3 else "")
+            if last_filter_debug_reports else ""
+        )
     )
 
 
