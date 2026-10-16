@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<importscript version="3" creator="M-Print® PRO v. 9.10.2.0" last_modified="05.08.2026 09:35:31" page_numbering="0" page_numbering_format="23" split_into_subprojecttree="0" merge_same_marker_types="0">
+<variant matno="2005100000" catalogvariantalias="ESG 6/17 MM WS ( ODC )" metallicard_inlay="1"><![CDATA[ESG 6/17 MM WS]]></variant>
+<filter guid="B0836BB4-8DBE-4240-8579-FAC4A920A4DA">
+<fix>0</fix>
+<os>0</os>
+<quote/>
+<delimiter value="1" keep_delimiters="false">;</delimiter>
+<start_at>0</start_at>
+</filter>
+<sort column="-1" order="1"/>
+<remove column="-1" start="-1"></remove>
+<counter column="-1" multiply="1"/>
+<mapping type="0" marker_row="1"/>
+<field name="MARKER" type="0" layer_id="2" layer_index="0" marker_row="1" link1="-1" text1="">
+<column special="0">5</column>
+</field>
+<importcount>1</importcount>
+</importscript>
+
+<!--SHA::ed372d5962a48090863b30c1ef442c3fae0abf3ac1a2167ee32a0c463b80c921::-->

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<importscript version="3" creator="M-Print® PRO v. 9.10.2.0" last_modified="05.08.2026 08:42:44" page_numbering="0" page_numbering_format="23" split_into_subprojecttree="0" merge_same_marker_types="0">
+<variant matno="1773220000" catalogvariantalias="MF 10/5 MM WS ( klem 2,5)" metallicard_inlay="1"><![CDATA[SM 27/27 MC NE WS]]></variant>
+<filter guid="2F5E5EE2-73CD-4832-9AE9-05EC545B22DC"/>
+<fix>0</fix>
+<os>0</os>
+<quote/>
+<delimiter value="1" keep_delimiters="false">;</delimiter>
+<start_at>0</start_at>
+<counter>0</counter>
+<repeat_coeff>1</repeat_coeff>
+<reference>6</reference>
+<ref_file/>
+<keep_src_file_order>false</keep_src_file_order>
+<use_ref_file>false</use_ref_file>
+<sort column="-1" order="1"/>
+<remove column="-1" start="-1"></remove>
+<counter column="-1" multiply="1"/>
+<mapping type="0" marker_row="1"/>
+<field name="MARKER" type="0" layer_id="2" layer_index="0" marker_row="1" link1="-1" text1="">
+<column special="0">5</column>
+</field>
+<importcount>1</importcount>
+</importscript>
+
+<!--SHA::b0fad2590d4608fe67079416ba75b18876c18b1bd75156de59203b5c65be1932::-->

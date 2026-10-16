@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<importscript version="3" creator="M-Print® PRO v. 9.10.2.0" last_modified="31.07.2026 15:41:45" page_numbering="0" page_numbering_format="23" split_into_subprojecttree="0" merge_same_marker_types="0">
+<variant matno="2657180000" catalogvariantalias="THM WO VIN 25.4/57.2 WS" metallicard_inlay="1"><![CDATA[THM WO VIN 25.4/57.2 WS]]></variant>
+<filter guid="B0836BB4-8DBE-4240-8579-FAC4A920A4DA">
+<fix>0</fix>
+<os>0</os>
+<quote/>
+<delimiter value="1" keep_delimiters="false">;</delimiter>
+<start_at>0</start_at>
+</filter>
+<sort column="-1" order="1"/>
+<extended_filter>
+<and_conjunction col_count="6">true</and_conjunction>
+<filter_items>
+<item col="5" expression="549">10</item>
+</filter_items>
+</extended_filter>
+<counter column="-1" multiply="1"/>
+<mapping type="0" marker_row="1" col_LPCV2Product="3" check_LPCV2Product="0" col_LPCV2Reference1="4" check_LPCV2Reference1="0" col_LPCV2Reference2="5" check_LPCV2Reference2="0" col_LPCV2Reference3="6" check_LPCV2Reference3="0" col_LPCV2Reference4="7" check_LPCV2Reference4="0" col_LPCV2Reference5="3" check_LPCV2Reference5="0"/>
+<field name="MARKER" type="0" layer_id="2" layer_index="0" marker_row="1" link1="-1" text1="">
+<column special="0">5</column>
+</field>
+<importcount>1</importcount>
+</importscript>
+
+<!--SHA::e236dc79b98ccbeb5d37b06707b7726a09ae9647c8f7ad5996b6651b8603d0da::-->
